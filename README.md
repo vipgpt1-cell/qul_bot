@@ -53,6 +53,18 @@ Send `/chatid` in the group (it works before anything is configured) — the bot
 docker compose up -d --build
 ```
 
+**Docker with a hosted database (e.g. [Neon](https://neon.tech)):** put Neon's connection string
+into `.env` as `DATABASE_URL` and run only the bot:
+
+```bash
+docker compose -f docker-compose.neon.yml up -d --build
+```
+
+Use Neon's *direct* connection (the host without `-pooler`). `sslmode=require` and
+`channel_binding=require` in the string are converted automatically. Neon's free compute suspends
+when idle; the bot reconnects on its own, so the first command after a quiet period can take
+a second longer. The bot itself still needs an always-on machine to run on.
+
 **Locally (SQLite, no services):**
 
 ```bash

@@ -1,0 +1,9 @@
+# Bot only, for use with a hosted database such as Neon (no local PostgreSQL container).
+#   1. Put the database connection string into .env as DATABASE_URL
+#      (Neon: use the *direct* connection, i.e. the host without "-pooler").
+#   2. docker compose -f docker-compose.neon.yml up -d --build
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env

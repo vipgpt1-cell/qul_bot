@@ -68,3 +68,35 @@ def test_missing_token_gives_a_readable_error(
     message = str(exit_info.value)
     assert "BOT_TOKEN" in message
     assert "Traceback" not in message
+
+
+NEON_URL = (
+    "postgresql://neondb_owner:p%40ss@ep-cool-123.eu-central-1.aws.neon.tech/neondb"
+    "?sslmode=require&channel_binding=require"
+)
+
+
+def test_neon_style_url_is_converted_for_asyncpg() -> None:
+    url = DatabaseSettings(database_url=NEON_URL).database_url
+    assert url == (
+        "postgresql+asyncpg://neondb_owner:p%40ss@ep-cool-123.eu-central-1.aws.neon.tech/neondb"
+        "?ssl=require"
+    )
+
+
+def test_converted_url_yields_valid_asyncpg_connect_arguments() -> None:
+    from sqlalchemy.engine import make_url
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    url = DatabaseSettings(database_url=NEON_URL).database_url
+    engine = create_async_engine(url)
+    _, kwargs = engine.dialect.create_connect_args(make_url(url))
+    assert kwargs["ssl"] == "require"
+    assert kwargs["password"] == "p@ss"
+    assert "sslmode" not in kwargs
+    assert "channel_binding" not in kwargs
+
+
+def test_other_urls_are_untouched() -> None:
+    for url in ("sqlite+aiosqlite:///x.db", "postgresql+asyncpg://u:p@h/db?ssl=require"):
+        assert DatabaseSettings(database_url=url).database_url == url

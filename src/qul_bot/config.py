@@ -1,10 +1,36 @@
 from __future__ import annotations
 
 from typing import Annotated
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+#: libpq options that asyncpg does not understand and that do not matter for us.
+_UNSUPPORTED_QUERY_PARAMS = frozenset({"channel_binding"})
+
+
+def normalize_database_url(value: str) -> str:
+    """Make a provider-style PostgreSQL URL usable with the asyncpg driver.
+
+    * `postgres://` / `postgresql://` get the `+asyncpg` driver.
+    * `sslmode=require` (libpq spelling, used by Neon, Supabase, ...) becomes `ssl=require`.
+    * `channel_binding=...` is dropped.
+    """
+    for prefix in ("postgres://", "postgresql://"):
+        if value.startswith(prefix):
+            value = "postgresql+asyncpg://" + value.removeprefix(prefix)
+            break
+    if not value.startswith("postgresql+asyncpg://"):
+        return value
+    parts = urlsplit(value)
+    query = [
+        ("ssl" if key == "sslmode" else key, val)
+        for key, val in parse_qsl(parts.query, keep_blank_values=True)
+        if key not in _UNSUPPORTED_QUERY_PARAMS
+    ]
+    return urlunsplit(parts._replace(query=urlencode(query)))
 
 
 class DatabaseSettings(BaseSettings):
@@ -17,11 +43,7 @@ class DatabaseSettings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _async_driver(cls, value: str) -> str:
-        """Hosting providers hand out `postgres://` / `postgresql://`; we need an async driver."""
-        for prefix in ("postgres://", "postgresql://"):
-            if value.startswith(prefix):
-                return "postgresql+asyncpg://" + value.removeprefix(prefix)
-        return value
+        return normalize_database_url(value)
 
 
 class Settings(DatabaseSettings):
