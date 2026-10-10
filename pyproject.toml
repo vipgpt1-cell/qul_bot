@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qul-bot"
+version = "0.1.0"
+description = "Telegram group task tracker for IT teams"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3.13,<4",
+    "sqlalchemy[asyncio]>=2.0.30,<2.2",
+    "asyncpg>=0.29",
+    "aiosqlite>=0.20",
+    "alembic>=1.13",
+    "pydantic-settings>=2.7",
+    "tzdata",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qul_bot"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
+ignore = [
+    "RUF001",  # Uzbek text legitimately contains look-alike characters (o', g')
+    "RUF002",
+    "RUF003",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+plugins = []
