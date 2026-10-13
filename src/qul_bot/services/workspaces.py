@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qul_bot.db.models import Area, Membership, Task, User, Workspace
 from qul_bot.domain.areas import normalize_slug
 from qul_bot.domain.enums import ACTIVE_STATUSES, Role
+from qul_bot.domain.specialty import Specialty
 from qul_bot.errors import InputError, NotFoundError, PermissionDenied
 
 
@@ -120,6 +121,21 @@ class WorkspaceService:
             if (admins or 0) <= 1:
                 raise PermissionDenied("last_admin")
         membership.role = role
+        return membership
+
+    async def set_specialty(
+        self,
+        workspace_id: int,
+        target: User,
+        specialty: Specialty | None,
+        actor_id: int,
+        actor_role: Role,
+    ) -> Membership:
+        """People set their own specialty; admins can set anyone's."""
+        if actor_id != target.id and actor_role is not Role.ADMIN:
+            raise PermissionDenied("admin_required")
+        membership = await self.require_membership(workspace_id, target.id)
+        membership.specialty = specialty
         return membership
 
     async def reviewers(self, workspace_id: int) -> list[User]:

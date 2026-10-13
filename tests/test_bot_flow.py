@@ -549,3 +549,137 @@ async def test_a_denied_first_command_still_registers_the_person(bot_env: Harnes
     assert "faqat adminlar" in h.session.last_text()
     await h.say(ADMIN, "/role @devvalijon reviewer")
     assert "Tekshiruvchi" in h.session.last_text()
+
+
+# ---- specialties and the assignee picker ----------------------------------------------
+
+
+async def test_specialty_by_text_and_by_admin(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/specialty backend")
+    assert "Backend" in h.session.last_text()
+    await h.say(VALI, "/specialty @devalisher qa")  # members cannot set other people's
+    assert "faqat adminlar" in h.session.last_text()
+    await h.say(ADMIN, "/specialty @devvalijon mobile")
+    assert "Mobile" in h.session.last_text()
+    their_message = await h.say(ALI, "hello")
+    await h.say(ADMIN, "/specialty devops", reply_to=their_message)
+    assert "DevOps" in h.session.last_text()
+    await h.say(ALI, "/specialty -")
+    assert "Belgilanmagan" in h.session.last_text()
+
+
+async def test_specialty_errors(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/specialty designer")
+    assert "Mutaxassislik topilmadi" in h.session.last_text()
+    assert "devops" in h.session.last_text()
+    await h.say(ALI, "/specialty @devvalijon")
+    assert "Foydalanish" in h.session.last_text()
+
+
+async def test_specialty_buttons_set_your_own(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/specialty")
+    buttons = h.session.buttons(h.session.sent()[-1])
+    assert len(buttons) == 8  # seven specialties + clear
+    backend = next(b for b in buttons if b == "sp:3")
+    await h.press(ALI, backend)
+    assert "Backend" in h.session.last_edit()
+    await h.say(ALI, "/team")
+    assert "Backend" in h.session.last_text()
+
+
+async def test_team_is_grouped_by_specialty(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/specialty backend")
+    await h.say(VALI, "/specialty mobile")
+    await h.say(ADMIN, "/team")
+    text = h.session.last_text()
+    assert text.index("Mobile") < text.index("Backend") < text.index("Belgilanmagan")
+    assert "Ali" in text
+    assert "Vali" in text
+
+
+async def test_picker_assigns_people_by_specialty(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/specialty backend")
+    await h.say(VALI, "/specialty mobile")
+    await h.say(ADMIN, "/task Build the API")
+    card = h.session.sent()[-1]
+    assert any(b.startswith("ta:assign:") for b in h.session.buttons(card))
+
+    await h.press(ADMIN, "ta:assign:1")  # step 1: groups with counts
+    menu = h.session.last_edit()
+    assert "Kimga tayinlaymiz" in menu
+    edited = h.session.edited()[-1]
+    labels = [
+        b.text
+        for row in edited.reply_markup.inline_keyboard  # type: ignore[union-attr]
+        for b in row
+    ]
+    assert any("Mobile (1)" in label for label in labels)
+    assert any("Backend (1)" in label for label in labels)
+    assert any("Belgilanmagan (2)" in label for label in labels)  # admin + reviewer
+
+    backend = next(
+        b.callback_data
+        for row in edited.reply_markup.inline_keyboard  # type: ignore[union-attr]
+        for b in row
+        if "Backend" in b.text and b.callback_data
+    )
+    await h.press(ADMIN, backend)  # step 2: people in that group
+    assert "Backend" in h.session.last_edit()
+
+    group_markup = h.session.edited()[-1].reply_markup
+    ali_button = next(
+        b.callback_data
+        for row in group_markup.inline_keyboard  # type: ignore[union-attr]
+        for b in row
+        if "Ali" in b.text and b.callback_data
+    )
+    h.session.reset()
+    await h.press(ADMIN, ali_button)  # pick Ali
+    assert "tg://user?id=3" in h.session.last_text()  # Ali is pinged
+    assert "Mas'ul: Ali" in h.session.last_edit()
+
+    await h.say(ADMIN, "/info 1")
+    assert "Mas'ul: Ali" in h.session.last_text()
+
+    await h.press(ADMIN, ali_button)  # pressing again removes
+    assert "hali tayinlanmagan" in h.session.last_edit()
+
+
+async def test_picker_close_restores_the_card_buttons(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ADMIN, "/task Something")
+    await h.press(ADMIN, "ta:assign:1")
+    await h.press(ADMIN, "ap:1:close:0:0")
+    markup = h.session.edited()[-1].reply_markup
+    data = [b.callback_data for row in markup.inline_keyboard for b in row]  # type: ignore[union-attr]
+    assert any(d and d.startswith("ta:start:") for d in data)
+
+
+async def test_picker_respects_task_permissions(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/task Private work @devalisher")
+    await h.press(VALI, "ta:assign:1")  # opening is harmless
+    h.session.reset()
+    await h.press(VALI, "ap:1:user:0:4")  # but changing an assigned task is not allowed
+    assert "mas'ul, muallif" in h.session.last_alert()
+
+
+async def test_old_commands_unaffected_by_new_button(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/task Fix crash")
+    data = h.session.buttons(h.session.sent()[-1])
+    assert {"ta:start:1", "ta:ready:1", "ta:me:1", "ta:assign:1", "ta:prio:1"} <= set(data)
+    assert all(len(d.encode()) <= 64 for d in data)

@@ -1,4 +1,4 @@
-"""Workspace administration: areas, team roles."""
+"""Workspace administration: areas, team roles, specialties."""
 
 from __future__ import annotations
 
@@ -8,9 +8,11 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qul_bot.bot.context import RequestContext
-from qul_bot.bot.formatting import esc, user_name
+from qul_bot.bot.formatting import esc, render_team, specialty_label, user_name
 from qul_bot.bot.handlers.helpers import replied_user, require_admin, resolve_usernames
+from qul_bot.bot.keyboards import specialty_keyboard
 from qul_bot.domain.enums import Role
+from qul_bot.domain.specialty import is_clear_word, parse_specialty
 from qul_bot.errors import InputError
 from qul_bot.parsing.task_input import normalize_apostrophes
 from qul_bot.services.workspaces import WorkspaceService
@@ -23,7 +25,6 @@ _ROLE_WORDS: dict[str, Role] = {
     "azo": Role.MEMBER,
     "a'zo": Role.MEMBER,
 }
-_ROLE_ICONS = {Role.ADMIN: "👑", Role.REVIEWER: "🔍", Role.MEMBER: "👤"}
 
 
 async def cmd_areas(message: Message, session: AsyncSession, ctx: RequestContext) -> None:
@@ -66,12 +67,49 @@ async def cmd_del_area(
 async def cmd_team(message: Message, session: AsyncSession, ctx: RequestContext) -> None:
     workspace = ctx.require_workspace()
     members = await WorkspaceService(session).list_members(workspace.id)
-    lines = [ctx.t("team.title"), ""]
-    for member in members:
-        role = ctx.t(f"role.{member.role.value}")
-        lines.append(f"{_ROLE_ICONS[member.role]} {user_name(member.user)} — {role}")
-    lines += ["", ctx.t("team.hint")]
-    await message.answer("\n".join(lines))
+    await message.answer(render_team(ctx.t, members))
+
+
+async def cmd_specialty(
+    message: Message, command: CommandObject, session: AsyncSession, ctx: RequestContext
+) -> None:
+    """`/specialty` (buttons), `/specialty backend`, `/specialty @user qa` (admin), `/specialty -`.
+
+    Also works as a reply to a person's message (admin).
+    """
+    workspace = ctx.require_workspace()
+    words = (command.args or "").split()
+    usernames = [w.lstrip("@").lower() for w in words if w.startswith("@")]
+    named = [w for w in words if not w.startswith("@")]
+    replied = await replied_user(session, ctx, message)
+
+    if not named:
+        if usernames or replied:
+            raise InputError("specialty_usage")
+        await message.answer(ctx.t("specialty.choose"), reply_markup=specialty_keyboard(ctx.t))
+        return
+
+    word = normalize_apostrophes(named[0])
+    specialty = None if is_clear_word(word) else parse_specialty(word)
+    if specialty is None and not is_clear_word(word):
+        raise InputError("bad_specialty", word=esc(named[0]))
+
+    users = await resolve_usernames(session, ctx, usernames)
+    if replied:
+        users.append(replied)
+    if not users:
+        users = [ctx.user]
+
+    workspaces = WorkspaceService(session)
+    for user in users:
+        await workspaces.set_specialty(workspace.id, user, specialty, ctx.user.id, ctx.actor.role)
+    await message.answer(
+        ctx.t(
+            "specialty.changed",
+            users=", ".join(user_name(u) for u in users),
+            specialty=specialty_label(ctx.t, specialty),
+        )
+    )
 
 
 async def cmd_role(
@@ -114,3 +152,4 @@ def register(router: Router) -> None:
     router.message.register(cmd_del_area, Command("delarea", ignore_case=True))
     router.message.register(cmd_team, Command("team", ignore_case=True))
     router.message.register(cmd_role, Command("role", ignore_case=True))
+    router.message.register(cmd_specialty, Command("specialty", ignore_case=True))

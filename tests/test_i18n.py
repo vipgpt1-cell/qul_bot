@@ -9,6 +9,7 @@ import pytest
 
 from qul_bot.bot.commands import _MENU_ADMINS, _MENU_EVERYONE
 from qul_bot.domain.enums import Priority, Role, TaskStatus
+from qul_bot.domain.specialty import Specialty
 from qul_bot.i18n import CATALOGS, DEFAULT_LOCALE, Translator
 from qul_bot.i18n.uz import MESSAGES
 
@@ -16,7 +17,7 @@ SRC = Path(__file__).parents[1] / "src" / "qul_bot"
 NAMESPACES = {
     "help", "chatid", "status", "priority", "role", "created", "edited", "restored", "card",
     "btn", "toast", "changed", "notify", "assigned", "unassigned", "comment", "delete", "list",
-    "digest", "areas", "area", "team", "menu", "err",
+    "digest", "areas", "area", "team", "menu", "err", "picker", "specialty",
 }  # fmt: skip
 TELEGRAM_TAGS = {"b", "i", "u", "s", "code", "pre", "a"}
 
@@ -55,13 +56,14 @@ def test_dynamic_key_families_are_complete() -> None:
     expected |= {f"changed.{s.value}" for s in TaskStatus} | {"changed.rejected"}
     expected |= {f"priority.{p.value}" for p in Priority}
     expected |= {f"role.{r.value}" for r in Role}
+    expected |= {f"specialty.{s.value}" for s in Specialty} | {"specialty.none"}
     expected |= {f"menu.{name}" for name in (*_MENU_EVERYONE, *_MENU_ADMINS)}
     assert expected - set(MESSAGES) == set()
 
 
 def test_no_unused_messages() -> None:
     text = "\n".join(p.read_text() for p in source_files())
-    dynamic_prefixes = ("status.", "changed.", "priority.", "role.", "menu.", "err.")
+    dynamic_prefixes = ("status.", "changed.", "priority.", "role.", "menu.", "err.", "specialty.")
     unused = [
         key
         for key in MESSAGES

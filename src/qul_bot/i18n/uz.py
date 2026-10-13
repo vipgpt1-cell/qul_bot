@@ -30,7 +30,7 @@ MESSAGES: dict[str, str] = {
         "/block 12 sabab — to'siq bor\n"
         "/info 12 · /edit 12 · /assign 12 · /comment 12 matn\n"
         "\n"
-        "<b>Jamoa</b>: /team · /areas · /addarea · /role"
+        "<b>Jamoa</b>: /team · /specialty (mutaxassislik) · /areas · /addarea · /role"
     ),
     "chatid.text": (
         "🆔 Chat ID: <code>{chat_id}</code>\n"
@@ -76,10 +76,16 @@ MESSAGES: dict[str, str] = {
     "btn.cancel": "🚫 Bekor qilish",
     "btn.reopen": "🔄 Qayta ochish",
     "btn.me": "🙋 Menga",
+    "btn.assign": "👥 Tayinlash",
+    "btn.picker_done": "✔️ Tayyor",
+    "btn.back": "⬅️ Orqaga",
+    "btn.specialty_clear": "🚫 Tozalash",
     "btn.priority": "🚦 Ustuvorlik",
     "btn.delete_yes": "🗑 Ha, o'chirilsin",
     "btn.delete_no": "Yo'q",
     "toast.assigned_me": "Siz mas'ul etib belgilandingiz",
+    "toast.unassigned": "Mas'uliyatdan olindi",
+    "toast.specialty_saved": "Saqlandi",
     # ---- status change notices ----------------------------------------------------------
     "changed.todo": "🔄 <b>#{number}</b> qayta ochildi — {actor}\n{title}",
     "changed.doing": "🔵 <b>#{number}</b> ustida ish boshlandi — {actor}\n{title}",
@@ -114,6 +120,21 @@ MESSAGES: dict[str, str] = {
     "digest.blocked": "⛔ Bloklangan",
     "digest.unassigned": "🙋 Mas'ulsiz",
     "digest.more": "… yana {count} ta",
+    # ---- assignee picker ----------------------------------------------------------------
+    "picker.menu": "👥 <b>Kimga tayinlaymiz?</b> Guruhni tanlang:",
+    "picker.group": "👥 <b>{specialty}</b> — ismni bosing (qayta bossangiz olib tashlanadi)",
+    # ---- specialties --------------------------------------------------------------------
+    "specialty.mobile": "Mobile",
+    "specialty.frontend": "Frontend",
+    "specialty.backend": "Backend",
+    "specialty.pm": "PM",
+    "specialty.qa": "QA",
+    "specialty.devops": "DevOps",
+    "specialty.other": "Boshqa",
+    "specialty.none": "Belgilanmagan",
+    "specialty.choose": "Mutaxassisligingizni tanlang:",
+    "specialty.saved": "✅ Mutaxassislik: {specialty}",
+    "specialty.changed": "✅ {users} — mutaxassislik: {specialty}",
     # ---- areas & team -------------------------------------------------------------------
     "areas.title": "📂 <b>Yo'nalishlar</b>",
     "areas.empty": (
@@ -124,6 +145,8 @@ MESSAGES: dict[str, str] = {
     "area.removed": "🗑 Yo'nalish o'chirildi: #{slug}. Vazifalar saqlanib qoldi.",
     "team.title": "👥 <b>Jamoa</b>",
     "team.hint": (
+        "Mutaxassislik: <code>/specialty</code> (o'zingiz uchun, tugmalar bilan) yoki admin: "
+        "<code>/specialty @username qa</code>.\n"
         "Rol berish (admin): <code>/role @username reviewer</code> yoki a'zo xabariga "
         "javob berib <code>/role reviewer</code>.\n"
         "Rollar: admin, reviewer (tekshiruvchi), member (a'zo)."
@@ -139,6 +162,7 @@ MESSAGES: dict[str, str] = {
     "menu.done": "Vazifani tugatish",
     "menu.digest": "Kunlik xulosa",
     "menu.help": "Yordam",
+    "menu.specialty": "Mutaxassislik tanlash",
     "menu.approve": "Vazifani tasdiqlash",
     "menu.reject": "Vazifani qaytarish",
     "menu.assign": "Mas'ul biriktirish",
@@ -199,6 +223,14 @@ MESSAGES: dict[str, str] = {
     "err.role_usage": (
         "Foydalanish: <code>/role @username reviewer</code> yoki a'zo xabariga javob berib "
         "<code>/role member</code>.\nRollar: admin, reviewer, member."
+    ),
+    "err.specialty_usage": (
+        "Foydalanish: <code>/specialty backend</code> (o'zingiz uchun) yoki "
+        "<code>/specialty @username qa</code> (admin). O'chirish: <code>/specialty -</code>"
+    ),
+    "err.bad_specialty": (
+        "Mutaxassislik topilmadi: <code>{word}</code>.\n"
+        "Mavjud: mobile, frontend, backend, pm, qa, devops, other."
     ),
     "err.same_status": "ℹ️ Vazifa allaqachon shu holatda: {status}.",
     "err.self_approval": (

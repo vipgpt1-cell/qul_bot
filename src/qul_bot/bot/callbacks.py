@@ -24,6 +24,7 @@ ACTION_TARGETS: dict[str, TaskStatus] = {
     "cancel": TaskStatus.CANCELLED,
 }
 ACTION_ME = "me"
+ACTION_ASSIGN = "assign"  # opens the "pick people by specialty" view
 ACTION_PRIORITY = "prio"
 ACTION_DELETE_YES = "delyes"
 ACTION_DELETE_NO = "delno"
@@ -64,3 +65,18 @@ def decode_filter(data: ListPage) -> tuple[TaskFilter, int]:
         include_closed=bool(data.closed),
     )
     return flt, data.page
+
+
+class AssignPick(CallbackData, prefix="ap"):
+    """A button in the assignee picker. `group` is a `domain.specialty` code (0 = none)."""
+
+    task_id: int
+    step: str  # "group" | "user" | "menu" | "close"
+    group: int = 0
+    user: int = 0
+
+
+class SpecialtyPick(CallbackData, prefix="sp"):
+    """Choosing your own specialty. `code` 0 clears it."""
+
+    code: int

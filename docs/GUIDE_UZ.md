@@ -57,7 +57,16 @@ Har bir vazifa xabarida tugmalar ham bor (▶️ Boshlash, 👀 Tekshiruvga, ✅
 * `/comment 12 matn` — izoh
 * `/delete 12` — o'chirish (muallif yoki admin), `/restore 12` — tiklash (admin)
 
-## 5. Adminlar uchun
+## 5. Mutaxassislik va tayinlash
+
+Har kim o'z mutaxassisligini belgilaydi: `/specialty` (tugmalar) yoki `/specialty backend`.
+Mavjud: **mobile, frontend, backend, pm, qa, devops, other**. Admin boshqalarga ham belgilay oladi:
+`/specialty @username qa`. `/team` jamoani mutaxassislik bo'yicha guruhlab ko'rsatadi.
+
+Vazifa kartasidagi **👥 Tayinlash** tugmasi: avval guruhni (Mobile, Backend...), keyin odamni
+tanlaysiz. Ismni bossangiz — tayinlanadi va unga xabar boradi; yana bossangiz — olib tashlanadi.
+
+## 6. Adminlar uchun
 
 * `/addarea mobile Mobil ilova` — yo'nalish qo'shish, `/delarea mobile`, `/areas`
 * `/role @username reviewer` — tekshiruvchi qilish (yoki xabariga javob bering: `/role reviewer`)

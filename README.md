@@ -145,6 +145,23 @@ or just `/assign 12` for yourself) · `/unassign 12 @user` · `/comment 12 text`
 
 Use `#-` or `muddat:-` in `/edit` to clear the area or the deadline.
 
+### Team specialties and picking assignees
+
+Every person can have a **specialty**: `mobile`, `frontend`, `backend`, `pm`, `qa`, `devops` or
+`other`. (Not to be confused with *areas*: an area labels a part of the *product*, a specialty
+labels the *person*.)
+
+| Command | Effect |
+|---|---|
+| `/specialty` | buttons to choose your own |
+| `/specialty backend` | set your own by text; `/specialty -` clears it |
+| `/specialty @user qa` | admin sets someone else's (or reply to them: `/specialty qa`) |
+| `/team` | the team grouped by specialty, with roles |
+
+On every open task card, **👥 Assign** lets the task giver pick: first the specialty group
+(with head-counts), then the people. Pressing a name assigns them (and pings them); pressing it
+again removes them. The same permission rules as `/assign` apply.
+
 ### Roles
 
 | Role | Can |

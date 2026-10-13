@@ -3,15 +3,20 @@ from __future__ import annotations
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from qul_bot.bot.callbacks import (
+    ACTION_ASSIGN,
     ACTION_DELETE_NO,
     ACTION_DELETE_YES,
     ACTION_ME,
     ACTION_PRIORITY,
+    AssignPick,
+    SpecialtyPick,
     TaskAction,
     encode_filter,
 )
-from qul_bot.db.models import Task
+from qul_bot.bot.formatting import group_by_specialty, specialty_label, truncate
+from qul_bot.db.models import Membership, Task
 from qul_bot.domain.enums import TaskStatus
+from qul_bot.domain.specialty import SPECIALTY_ORDER, Specialty, to_code
 from qul_bot.i18n import Translator
 from qul_bot.services.tasks import TaskFilter
 
@@ -38,7 +43,13 @@ def task_keyboard(t: Translator, task: Task) -> InlineKeyboardMarkup:
 
     rows = [[button(action, key) for action, key in _PRIMARY[task.status]]]
     if task.status in _SECONDARY_STATUSES:
-        rows.append([button(ACTION_ME, "btn.me"), button(ACTION_PRIORITY, "btn.priority")])
+        rows.append(
+            [
+                button(ACTION_ME, "btn.me"),
+                button(ACTION_ASSIGN, "btn.assign"),
+                button(ACTION_PRIORITY, "btn.priority"),
+            ]
+        )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -73,3 +84,60 @@ def pagination_keyboard(flt: TaskFilter, page: int, pages: int) -> InlineKeyboar
             InlineKeyboardButton(text="▶️", callback_data=encode_filter(flt, page + 1).pack())
         )
     return InlineKeyboardMarkup(inline_keyboard=[row])
+
+
+def _pairs(buttons: list[InlineKeyboardButton]) -> list[list[InlineKeyboardButton]]:
+    return [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
+
+
+def _pick(task: Task, step: str, *, group: int = 0, user: int = 0) -> str:
+    return AssignPick(task_id=task.id, step=step, group=group, user=user).pack()
+
+
+def assign_menu_keyboard(
+    t: Translator, task: Task, members: list[Membership]
+) -> InlineKeyboardMarkup:
+    """Step 1 of the picker: which part of the team?"""
+    groups = [
+        InlineKeyboardButton(
+            text=f"{specialty_label(t, specialty)} ({len(people)})",
+            callback_data=_pick(task, "group", group=to_code(specialty)),
+        )
+        for specialty, people in group_by_specialty(members)
+    ]
+    done = InlineKeyboardButton(text=t("btn.picker_done"), callback_data=_pick(task, "close"))
+    return InlineKeyboardMarkup(inline_keyboard=[*_pairs(groups), [done]])
+
+
+def assign_group_keyboard(
+    t: Translator, task: Task, people: list[Membership], group: Specialty | None
+) -> InlineKeyboardMarkup:
+    """Step 2: people of one specialty; pressing a name toggles the assignment."""
+    assigned = {u.id for u in task.assignees}
+    names = [
+        InlineKeyboardButton(
+            text=f"{'✅ ' if m.user_id in assigned else ''}{truncate(m.user.display_name, 24)}",
+            callback_data=_pick(task, "user", group=to_code(group), user=m.user_id),
+        )
+        for m in people
+    ]
+    controls = [
+        InlineKeyboardButton(text=t("btn.back"), callback_data=_pick(task, "menu")),
+        InlineKeyboardButton(text=t("btn.picker_done"), callback_data=_pick(task, "close")),
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=[*_pairs(names), controls])
+
+
+def specialty_keyboard(t: Translator) -> InlineKeyboardMarkup:
+    """Choose your own specialty."""
+    buttons = [
+        InlineKeyboardButton(
+            text=specialty_label(t, specialty),
+            callback_data=SpecialtyPick(code=to_code(specialty)).pack(),
+        )
+        for specialty in SPECIALTY_ORDER
+    ]
+    clear = InlineKeyboardButton(
+        text=t("btn.specialty_clear"), callback_data=SpecialtyPick(code=0).pack()
+    )
+    return InlineKeyboardMarkup(inline_keyboard=[*_pairs(buttons), [clear]])

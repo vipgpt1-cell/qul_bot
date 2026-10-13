@@ -10,8 +10,9 @@ import html
 from collections.abc import Iterable, Sequence
 from datetime import date
 
-from qul_bot.db.models import Task, TaskComment, User
-from qul_bot.domain.enums import ACTIVE_STATUSES, Priority, TaskStatus
+from qul_bot.db.models import Membership, Task, TaskComment, User
+from qul_bot.domain.enums import ACTIVE_STATUSES, Priority, Role, TaskStatus
+from qul_bot.domain.specialty import SPECIALTY_ORDER, Specialty
 from qul_bot.i18n import Translator
 from qul_bot.services.tasks import Digest, StatusChange, TaskPage
 
@@ -29,6 +30,18 @@ PRIORITY_EMOJI: dict[Priority, str] = {
     Priority.NORMAL: "🟡",
     Priority.LOW: "🟢",
 }
+
+SPECIALTY_EMOJI: dict[Specialty, str] = {
+    Specialty.MOBILE: "📱",
+    Specialty.FRONTEND: "🎨",
+    Specialty.BACKEND: "⚙️",
+    Specialty.PM: "📋",
+    Specialty.QA: "🧪",
+    Specialty.DEVOPS: "🛠",
+    Specialty.OTHER: "🧩",
+}
+NO_SPECIALTY_EMOJI = "❔"
+ROLE_ICONS: dict[Role, str] = {Role.ADMIN: "👑", Role.REVIEWER: "🔍", Role.MEMBER: "👤"}
 
 LINE_TITLE_LIMIT = 60
 DESCRIPTION_LIMIT = 700
@@ -91,6 +104,37 @@ def status_label(t: Translator, status: TaskStatus) -> str:
 
 def priority_label(t: Translator, priority: Priority) -> str:
     return f"{PRIORITY_EMOJI[priority]} {t(f'priority.{priority.value}')}"
+
+
+def specialty_label(t: Translator, specialty: Specialty | None) -> str:
+    if specialty is None:
+        return f"{NO_SPECIALTY_EMOJI} {t('specialty.none')}"
+    return f"{SPECIALTY_EMOJI[specialty]} {t(f'specialty.{specialty.value}')}"
+
+
+def group_by_specialty(
+    members: Sequence[Membership],
+) -> list[tuple[Specialty | None, list[Membership]]]:
+    """Non-empty groups in display order; people without a specialty come last."""
+    groups: list[tuple[Specialty | None, list[Membership]]] = []
+    for specialty in (*SPECIALTY_ORDER, None):
+        people = [m for m in members if m.specialty == specialty]
+        if people:
+            groups.append((specialty, people))
+    return groups
+
+
+def render_team(t: Translator, members: Sequence[Membership]) -> str:
+    lines = [t("team.title"), ""]
+    for specialty, people in group_by_specialty(members):
+        lines.append(f"<b>{specialty_label(t, specialty)}</b> ({len(people)})")
+        for member in people:
+            role = t(f"role.{member.role.value}")
+            name = esc(truncate(member.user.display_name, 30))
+            lines.append(f"{ROLE_ICONS[member.role]} {name} — {role}")
+        lines.append("")
+    lines.append(t("team.hint"))
+    return "\n".join(lines)
 
 
 # ---- single task ----------------------------------------------------------------------

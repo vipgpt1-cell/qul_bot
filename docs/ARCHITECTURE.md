@@ -73,6 +73,8 @@ workspaces ─┬─ memberships ── users
   id; the `migrate_to_chat_id` service message is handled so the workspace follows.
 * `users.telegram_id` is nullable: a user is *our* identity, and Telegram is one way to reach it.
   Never key anything on `@username`; usernames change and may be absent.
+* `memberships.specialty` (mobile, frontend, backend, pm, qa, devops, other) describes the *person*
+  and drives the assignee picker; it is separate from `areas`, which describe the *product*.
 * `tasks.number` is the human id (`#42`), unique per workspace; `tasks.id` is internal.
 * `task_events` records every change (`task.created`, `task.status_changed`, …) with the actor and
   a JSON payload.

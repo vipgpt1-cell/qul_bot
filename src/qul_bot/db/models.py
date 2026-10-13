@@ -33,6 +33,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from qul_bot.db.base import Base
 from qul_bot.db.types import UTCDateTime, json_default, str_enum, utcnow
 from qul_bot.domain.enums import EventType, Priority, Role, TaskStatus
+from qul_bot.domain.specialty import Specialty
 
 
 class Workspace(Base):
@@ -74,6 +75,8 @@ class Membership(Base):
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     role: Mapped[Role] = mapped_column(str_enum(Role, 16), default=Role.MEMBER)
+    #: Which part of the team the person belongs to (mobile, backend, ...); optional.
+    specialty: Mapped[Specialty | None] = mapped_column(str_enum(Specialty, 16))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     user: Mapped[User] = relationship(lazy="joined")
