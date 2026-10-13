@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qul_bot.db.models import Task, TaskComment, TaskEvent, User, Workspace, task_assignees
@@ -120,6 +120,14 @@ class Digest:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class HistoryEntry:
+    event: TaskEvent
+    actor_name: str
+    #: Display name of the person an assign/unassign event is about, if any.
+    subject_name: str | None
+
+
 def _state(task: Task) -> TaskState:
     return TaskState(
         status=task.status,
@@ -214,6 +222,56 @@ class TaskService:
         )
         items = (await self.session.execute(stmt)).scalars().all()
         return TaskPage(items=items, total=total, page=page, pages=pages)
+
+    async def search(self, workspace_id: int, query: str, limit: int = 15) -> TaskPage:
+        """Tasks whose title or description contains `query` (any status, case-insensitive)."""
+        needle = query.strip().lower()
+        if len(needle) < 2:
+            raise InputError("find_usage")
+        match = or_(
+            func.lower(Task.title).contains(needle, autoescape=True),
+            func.lower(func.coalesce(Task.description, "")).contains(needle, autoescape=True),
+        )
+        base = select(Task).where(
+            Task.workspace_id == workspace_id, Task.deleted_at.is_(None), match
+        )
+        total = (await self.session.scalar(select(func.count()).select_from(base.subquery()))) or 0
+        status_rank = case({s: i for i, s in enumerate(STATUS_ORDER)}, value=Task.status)
+        rows = (
+            (
+                await self.session.execute(
+                    base.order_by(status_rank, Task.number.desc()).limit(limit)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return TaskPage(items=rows, total=total, page=0, pages=1)
+
+    async def history(self, task_id: int, limit: int = 15) -> list[HistoryEntry]:
+        """The most recent events of a task, oldest first, with people's names resolved."""
+        result = await self.session.execute(
+            select(TaskEvent)
+            .where(TaskEvent.task_id == task_id)
+            .order_by(TaskEvent.id.desc())
+            .limit(limit)
+        )
+        events = list(reversed(result.scalars().all()))
+        subject_ids = {
+            int(e.data["user_id"]) for e in events if isinstance(e.data.get("user_id"), int)
+        }
+        names: dict[int, str] = {}
+        if subject_ids:
+            users = await self.session.execute(select(User).where(User.id.in_(subject_ids)))
+            names = {u.id: u.display_name for u in users.scalars().all()}
+        return [
+            HistoryEntry(
+                event=e,
+                actor_name=e.actor.display_name if e.actor else "—",
+                subject_name=names.get(int(e.data["user_id"])) if "user_id" in e.data else None,
+            )
+            for e in events
+        ]
 
     async def digest(self, workspace_id: int, today: date) -> Digest:
         result = await self.session.execute(

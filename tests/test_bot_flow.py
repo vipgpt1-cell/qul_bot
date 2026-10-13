@@ -683,3 +683,137 @@ async def test_old_commands_unaffected_by_new_button(bot_env: Harness) -> None:
     data = h.session.buttons(h.session.sent()[-1])
     assert {"ta:start:1", "ta:ready:1", "ta:me:1", "ta:assign:1", "ta:prio:1"} <= set(data)
     assert all(len(d.encode()) <= 64 for d in data)
+
+
+# ---- comfort features -----------------------------------------------------------------
+
+
+async def test_replying_to_a_card_needs_no_task_number(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/task Fix crash @devalisher")
+    card = h.last_bot_message()
+
+    await h.say(ALI, "/doing", reply_to=card)
+    assert "ustida ish boshlandi" in h.session.last_text()
+    await h.say(ALI, "/comment Boshladim", reply_to=card)
+    assert "Boshladim" in h.session.last_text()
+    await h.say(ALI, "/info", reply_to=card)
+    assert "Boshladim" in h.session.last_text()
+    await h.say(ADMIN, "/assign @devvalijon", reply_to=card)
+    assert "tg://user?id=4" in h.session.last_text()
+    await h.say(ALI, "/done", reply_to=card)
+    assert "tekshiruvga yuborildi" in h.session.last_text()
+    await h.say(REVIEWER, "/approve", reply_to=h.last_bot_message())  # a status notice works too
+    assert "bajarildi va tasdiqlandi" in h.session.last_text()
+
+
+async def test_an_explicit_number_beats_the_replied_card(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/task First")
+    first_card = h.last_bot_message()
+    await h.say(ALI, "/task Second")
+    await h.say(ALI, "/info 2", reply_to=first_card)
+    assert "Second" in h.session.last_text()
+
+
+async def test_replying_to_a_card_with_task_does_not_clone_the_card(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/task Real task")
+    await h.say(ALI, "/task", reply_to=h.last_bot_message())
+    assert "Vazifa nomini yozing" in h.session.last_text()
+    await h.say(ALI, "/list")
+    assert "Jami: 1" in h.session.last_text()
+
+
+async def test_replying_to_a_non_card_still_asks_for_a_number(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/task Something")
+    await h.say(ALI, "/list")
+    await h.say(ALI, "/done", reply_to=h.last_bot_message())
+    assert "Vazifa raqamini yozing" in h.session.last_text()
+
+
+async def test_history_command(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/task Tracked work @devalisher")
+    await h.say(ALI, "/doing 1")
+    await h.say(ALI, "/done 1")
+    await h.say(REVIEWER, "/reject 1 testlar yo'q")
+    await h.say(ALI, "/history 1")
+    text = h.session.last_text()
+    assert "tarixi" in text
+    assert "yaratdi" in text
+    assert "⚪ Kutilmoqda → 🔵 Jarayonda" in text
+    assert "🔵 Jarayonda → 👀 Tekshiruvda" in text
+    assert "👀 Tekshiruvda → 🔵 Jarayonda" in text  # the rejection
+    assert "testlar yo'q" in text
+    # the history message itself names the task, so replying to it works as well
+    await h.say(ALI, "/info", reply_to=h.last_bot_message())
+    assert "Tracked work" in h.session.last_text()
+
+
+async def test_find_command(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/task Login crash on iOS")
+    await h.say(ALI, "/task Update the docs\nmentions the login flow")
+    await h.say(ALI, "/task Unrelated")
+    await h.say(ALI, "/find LOGIN")
+    text = h.session.last_text()
+    assert "Qidiruv" in text
+    assert "Login crash" in text
+    assert "Update the docs" in text  # found through its description
+    assert "Unrelated" not in text
+    await h.say(ALI, "/find zzzz")
+    assert "hech narsa topilmadi" in h.session.last_text()
+    await h.say(ALI, "/find x")
+    assert "kamida 2 ta belgi" in h.session.last_text()
+    await h.say(ALI, "/find")
+    assert "kamida 2 ta belgi" in h.session.last_text()
+
+
+async def test_digest_schedule_settings(bot_env: Harness) -> None:
+    h = bot_env
+    await introduce(h)
+    await h.say(ALI, "/digest")
+    assert "09:00" in h.session.last_text()  # the on-demand digest says when it posts by itself
+    await h.say(ALI, "/digest 08:30")
+    assert "faqat adminlar" in h.session.last_text()
+
+    await h.say(ADMIN, "/digest 08:30")
+    assert "08:30" in h.session.last_text()
+    await h.say(ALI, "/digest")
+    assert "08:30" in h.session.last_text()
+
+    await h.say(ADMIN, "/digest off")
+    assert "o'chirildi" in h.session.last_text()
+    await h.say(ALI, "/digest")
+    assert "o'chirilgan" in h.session.last_text()
+    await h.say(ADMIN, "/digest on")
+    assert "yoqildi" in h.session.last_text()
+
+    await h.say(ADMIN, "/digest 25:99")
+    assert "Vaqtni tushunmadim" in h.session.last_text()
+
+
+async def test_help_is_a_menu_with_sections(bot_env: Harness) -> None:
+    h = bot_env
+    await h.say(ALI, "/help")
+    main = h.session.sent()[-1]
+    assert "Qul Bot" in main.text
+    buttons = h.session.buttons(main)
+    assert sorted(buttons) == ["hp:create", "hp:team", "hp:view", "hp:workflow"]
+
+    await h.press(ALI, "hp:workflow")
+    assert "Tekshiruvda" in h.session.last_edit()
+    assert "/done" in h.session.last_edit()
+    assert h.session.edited()[-1].reply_markup is not None
+
+    await h.press(ALI, "hp:main")
+    assert "Bo'limni tanlang" in h.session.last_edit()
+    await h.press(ALI, "hp:nonsense")  # unknown page: ignored, no crash

@@ -16,6 +16,9 @@ in CI; locally use `make test-pg`.
 * **Telegram limits:** 4096 chars per message, 64 bytes of callback data. Keep rows bounded.
 * **Schema changes** need an Alembic migration (`make migration m="…"`, review it, keep it free of
   application imports). `tests/test_migrations.py` fails when models and migrations drift.
+* **Background work** lives in `bot/scheduler.py`; scheduling *rules* stay pure in
+  `domain/schedule.py`. Anything that posts on a timer must claim before it sends
+  (at most once), like `DigestService`.
 * **Timestamps** are timezone-aware UTC (`UTCDateTime`). "Today" is computed in the workspace
   timezone (`RequestContext.today`).
 * Never key anything on `@username`; use user ids.

@@ -80,3 +80,9 @@ class SpecialtyPick(CallbackData, prefix="sp"):
     """Choosing your own specialty. `code` 0 clears it."""
 
     code: int
+
+
+class HelpPage(CallbackData, prefix="hp"):
+    """A section of the help menu (`main` returns to the menu)."""
+
+    page: str

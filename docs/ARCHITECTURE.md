@@ -43,6 +43,16 @@ exactly like the bot does. If you find yourself writing a business rule in `bot/
 3. The handler calls a service. Failures are `AppError`s with a stable code; one error handler
    translates them for the user.
 
+### Background job: the daily digest
+
+`bot/scheduler.py` runs next to polling (one `asyncio` task, ticking every minute).
+`DigestService.claim_due` decides which workspaces are due using the pure rule in
+`domain/schedule.py` (working day, local time reached, within a 3-hour grace window, not yet
+posted today) and **claims** the day with an atomic compare-and-set on
+`workspaces.last_digest_on` *before* anything is sent. A crash or a failed send therefore costs
+one digest, never a duplicate. No scheduler library or extra process is needed; it can move to
+one later without touching the rules.
+
 ### Why these choices
 
 * **Long polling, not webhooks.** One small group needs no public URL, TLS or ingress. aiogram can
@@ -125,8 +135,8 @@ is missing. `workspaces.locale` selects the language per workspace.
 
 | Phase | Scope |
 |---|---|
-| **Done (this version)** | Capture (one-liner + reply), areas, priorities, deadlines, assignees, review workflow, buttons, lists/filters/pagination, digest, comments, soft delete, roles, event log, migrations, Docker, CI |
-| **Next** | Scheduled daily digest and deadline reminders (a small scheduler task), private reminders to assignees, mapping forum topics to areas, CSV export |
+| **Done (this version)** | Capture (one-liner + reply), areas, priorities, deadlines, assignees, specialties and assignee picker, review workflow, buttons, reply-to-card shortcuts, lists/filters/pagination, search, history, scheduled daily digest, comments, soft delete, roles, event log, migrations, Docker, CI |
+| **Next** | Private deadline reminders to assignees (needs an opt-in `/start` in DM), mapping forum topics to areas, CSV export, weekly summary |
 | **Then** | Outbox + webhooks, GitHub integration, REST API, read-only web dashboard |
 | **Later** | Own task platform, more locales, optional AI helpers (e.g. "turn this thread into tasks") |
 
@@ -135,4 +145,5 @@ is missing. `workspaces.locale` selects the language per workspace.
 * The bot only learns about people when they use a command or are replied to; `@username`
   assignment of someone who never interacted fails with a clear message.
 * In a private chat the workspace is inferred when the user belongs to exactly one.
-* Digest/reminders are on demand (`/digest`), not scheduled yet.
+* The digest runs on a fixed Mon–Fri schedule; custom working days are not configurable yet.
+* Search is case-insensitive for ASCII on SQLite and for all of Unicode on PostgreSQL (production).

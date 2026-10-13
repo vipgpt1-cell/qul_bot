@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 
 from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
@@ -8,6 +9,7 @@ from pydantic import ValidationError
 
 from qul_bot.bot.app import create_bot, create_dispatcher
 from qul_bot.bot.commands import publish_menus
+from qul_bot.bot.scheduler import run_scheduler
 from qul_bot.config import Settings
 from qul_bot.db.session import create_engine, create_sessionmaker
 from qul_bot.i18n import Translator
@@ -42,8 +44,10 @@ async def run() -> None:
         )
 
     engine = create_engine(settings.database_url)
+    sessionmaker = create_sessionmaker(engine)
     bot = create_bot(settings)
-    dp = create_dispatcher(settings, create_sessionmaker(engine))
+    dp = create_dispatcher(settings, sessionmaker)
+    scheduler: asyncio.Task[None] | None = None
     try:
         try:
             me = await bot.get_me()
@@ -56,8 +60,13 @@ async def run() -> None:
         log.info("Starting @%s (chats allowed: %s)", me.username, settings.allowed_chat_ids)
         await publish_menus(bot, Translator(settings.default_locale))
         await bot.delete_webhook(drop_pending_updates=False)
+        scheduler = asyncio.create_task(run_scheduler(bot, sessionmaker), name="digest-scheduler")
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        if scheduler is not None:
+            scheduler.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await scheduler
         await bot.session.close()
         await engine.dispose()
 

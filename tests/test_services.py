@@ -425,3 +425,77 @@ async def test_chat_migration_keeps_workspace(world: World) -> None:
     moved = await workspaces.find_by_chat(-1009999999999)
     assert moved is not None
     assert moved.id == world.workspace.id
+
+
+# ---- search & history -----------------------------------------------------------------
+
+
+async def test_search_finds_titles_and_descriptions_in_any_status(world: World) -> None:
+    service = TaskService(world.session)
+    login = await create(world, "Fix Login crash", description="happens on iOS")
+    await create(world, "Update docs")
+    done = await create(world, "Old LOGIN bug", assignee_usernames=["devalisher"])
+    await service.change_status(done, world.dev_actor, S.REVIEW)
+    await service.change_status(done, world.reviewer_actor, S.DONE)
+
+    by_title = await service.search(world.workspace.id, "login")
+    assert {t.title for t in by_title.items} == {"Fix Login crash", "Old LOGIN bug"}
+    by_description = await service.search(world.workspace.id, "IOS")
+    assert [t.id for t in by_description.items] == [login]
+    assert (await service.search(world.workspace.id, "nothing like this")).total == 0
+
+
+async def test_search_treats_wildcards_literally_and_limits_results(world: World) -> None:
+    service = TaskService(world.session)
+    await create(world, "100% done")
+    await create(world, "plain title")
+    assert [t.title for t in (await service.search(world.workspace.id, "100%")).items] == [
+        "100% done"
+    ]
+    assert (await service.search(world.workspace.id, "%%")).total == 0
+
+    for i in range(20):
+        await create(world, f"bulk item {i}")
+    page = await service.search(world.workspace.id, "bulk item", limit=15)
+    assert (page.total, len(page.items)) == (20, 15)
+
+
+async def test_search_needs_a_real_query_and_stays_in_the_workspace(world: World) -> None:
+    service = TaskService(world.session)
+    with pytest.raises(InputError) as exc:
+        await service.search(world.workspace.id, " a ")
+    assert exc.value.code == "find_usage"
+    other = await WorkspaceService(world.session).create(-1009, "Other", "uz", "Asia/Tashkent")
+    await create(world, "secret login")
+    assert (await service.search(other.id, "login")).total == 0
+
+
+async def test_history_lists_events_with_names(world: World) -> None:
+    service = TaskService(world.session)
+    task_id = await create(world, "Tracked")
+    await service.assign(task_id, world.dev_actor, [world.dev2])
+    await service.change_status(task_id, world.dev2_actor, S.BLOCKED, reason="waiting")
+    await service.edit(task_id, world.dev_actor, TaskPatch(title="Tracked well"))
+
+    history = await service.history(task_id)
+    kinds = [h.event.type for h in history]
+    assert kinds == [
+        EventType.CREATED,
+        EventType.ASSIGNED,
+        EventType.STATUS_CHANGED,
+        EventType.EDITED,
+    ]
+    assert history[0].actor_name == "Alisher"
+    assigned = history[1]
+    assert assigned.subject_name == "Valijon"
+    assert history[2].event.data["reason"] == "waiting"
+
+
+async def test_history_is_limited_to_the_latest_events(world: World) -> None:
+    service = TaskService(world.session)
+    task_id = await create(world, "Chatty")
+    for i in range(10):
+        await service.comment(task_id, world.dev_actor, f"note {i}")
+    history = await service.history(task_id, limit=4)
+    assert len(history) == 4
+    assert history[0].event.id < history[-1].event.id  # oldest of the latest first

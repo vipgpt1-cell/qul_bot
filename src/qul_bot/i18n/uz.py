@@ -2,35 +2,75 @@
 
 MESSAGES: dict[str, str] = {
     # ---- help & onboarding --------------------------------------------------------------
-    "help.text": (
+    "help.main": (
         "👋 <b>Qul Bot</b> — jamoaviy vazifalar yordamchisi.\n"
         "\n"
-        "<b>Vazifa qo'shish</b>\n"
-        "<code>/task Login xatosini tuzatish #mobile @username !yuqori muddat:juma</code>\n"
-        "Yoki biror xabarga <b>javob berib</b> /task yuboring — xabar vazifaga aylanadi.\n"
+        "⚡ <b>Eng tez yo'l:</b> biror xabarga <b>javob berib</b> /task yuboring — "
+        "xabar vazifaga aylanadi.\n"
         "\n"
-        "<b>Belgilar</b> (hammasi ixtiyoriy):\n"
-        "• <code>#nom</code> — yo'nalish\n"
-        "• <code>@username</code> — mas'ul\n"
-        "• <code>!yuqori</code> — ustuvorlik: shoshilinch, yuqori, o'rta, past\n"
-        "• <code>muddat:ertaga</code> — yoki juma, 25.10, 3d (3 kun), 2w (2 hafta)\n"
+        "Yoki bir qatorda:\n"
+        "<code>/task Login xatosi #mobile @username !yuqori muddat:juma</code>\n"
         "\n"
-        "<b>Ro'yxatlar</b>\n"
-        "/my — mening vazifalarim\n"
-        "/list — ochiq vazifalar (masalan: <code>/list mobile !yuqori</code>)\n"
-        "/review — tekshiruv kutayotganlar\n"
-        "/digest — kunlik xulosa\n"
-        "Yo'nalish nomi ham ishlaydi, masalan /mobile (yo'nalishlar: /areas)\n"
+        "Bo'limni tanlang 👇"
+    ),
+    "help.btn.create": "🆕 Vazifa qo'shish",
+    "help.btn.workflow": "🔄 Jarayon",
+    "help.btn.view": "🔍 Ko'rish va qidirish",
+    "help.btn.team": "👥 Jamoa va sozlamalar",
+    "help.page.create": (
+        "🆕 <b>Vazifa qo'shish</b>\n"
         "\n"
-        "<b>Jarayon</b>\n"
+        "<code>/task Sarlavha #nom @username !daraja muddat:ertaga</code>\n"
+        "\n"
+        "Faqat sarlavha shart, qolganlari ixtiyoriy:\n"
+        "• <code>#nom</code> — yo'nalish (ro'yxat: /areas)\n"
+        "• <code>@username</code> — mas'ul (bir nechta bo'lishi mumkin)\n"
+        "• <code>!yuqori</code> — shoshilinch, yuqori, o'rta, past\n"
+        "• <code>muddat:ertaga</code> — bugun, ertaga, juma, 25.10, 3d, 2w\n"
+        "\n"
+        "Ko'p qatorli xabarda 1-qator sarlavha, qolgani tavsif bo'ladi.\n"
+        "💡 Xabarga <b>javob berib</b> /task yozsangiz, o'sha xabar vazifaga aylanadi."
+    ),
+    "help.page.workflow": (
+        "🔄 <b>Jarayon</b>\n"
+        "\n"
+        "Kutilmoqda → Jarayonda → Tekshiruvda → Bajarildi\n"
+        "\n"
         "/doing 12 — boshladim\n"
         "/done 12 — tugatdim (tekshiruvga ketadi)\n"
         "/approve 12 — tasdiqlash <i>(tekshiruvchi)</i>\n"
         "/reject 12 sabab — qaytarish <i>(tekshiruvchi)</i>\n"
         "/block 12 sabab — to'siq bor\n"
-        "/info 12 · /edit 12 · /assign 12 · /comment 12 matn\n"
+        "/cancel 12 · /reopen 12\n"
         "\n"
-        "<b>Jamoa</b>: /team · /specialty (mutaxassislik) · /areas · /addarea · /role"
+        "💡 Raqam yozmasdan, vazifa xabariga <b>javob berib</b> ham bo'ladi: "
+        "<code>/done</code>, <code>/comment matn</code>.\n"
+        "Vazifa kartasidagi tugmalar ham xuddi shuni qiladi."
+    ),
+    "help.page.view": (
+        "🔍 <b>Ko'rish va qidirish</b>\n"
+        "\n"
+        "/my — mening vazifalarim\n"
+        "/list — ochiq vazifalar: <code>/list mobile !yuqori</code>, "
+        "<code>/list @username</code>, <code>/list all</code>\n"
+        "/review — tekshiruv kutayotganlar\n"
+        "/mobile — yo'nalish nomi bilan\n"
+        "/find login — qidirish\n"
+        "/digest — xulosa\n"
+        "/info 12 yoki /t12 — vazifa tafsiloti\n"
+        "/history 12 — vazifa tarixi"
+    ),
+    "help.page.team": (
+        "👥 <b>Jamoa va sozlamalar</b>\n"
+        "\n"
+        "/team — jamoa (mutaxassislik bo'yicha)\n"
+        "/specialty — o'z mutaxassisligingiz\n"
+        "/edit 12 … · /assign 12 @user · /comment 12 matn\n"
+        "\n"
+        "<b>Adminlar:</b>\n"
+        "/addarea nom · /delarea nom · /areas\n"
+        "/role @user reviewer · /specialty @user qa\n"
+        "/digest 09:00 — avtomatik xulosa vaqti · /digest off"
     ),
     "chatid.text": (
         "🆔 Chat ID: <code>{chat_id}</code>\n"
@@ -120,6 +160,30 @@ MESSAGES: dict[str, str] = {
     "digest.blocked": "⛔ Bloklangan",
     "digest.unassigned": "🙋 Mas'ulsiz",
     "digest.more": "… yana {count} ta",
+    "digest.enabled": "✅ Avtomatik xulosa yoqildi: har ish kuni {time} ({tz}).",
+    "digest.disabled": "🔕 Avtomatik xulosa o'chirildi. Yoqish: /digest on",
+    "digest.schedule_on": "🕘 Avtomatik xulosa: har ish kuni {time} ({tz})",
+    "digest.schedule_off": "🔕 Avtomatik xulosa o'chirilgan (admin yoqishi mumkin: /digest on)",
+    "find.title": "🔎 <b>Qidiruv:</b> «{query}»",
+    "find.empty": "🔎 «{query}» bo'yicha hech narsa topilmadi.",
+    "find.more": "… yana {count} ta. Aniqroq so'z yozing.",
+    # ---- history ----------------------------------------------------------------------
+    "history.title": "🕘 <b>#{number}</b> tarixi\n{title}",
+    "history.created": "🆕 {actor} yaratdi",
+    "history.status": "🔄 {actor}: {source} → {target}",
+    "history.reason": " — «{reason}»",
+    "history.assigned": "👤 {actor} → {user} tayinlandi",
+    "history.auto_assigned": "👤 {actor} mas'ul bo'ldi",
+    "history.unassigned": "👤 {actor} → {user} mas'uliyatdan olindi",
+    "history.edited": "✏️ {actor} o'zgartirdi: {fields}",
+    "history.commented": "💬 {actor} izoh qoldirdi",
+    "history.deleted": "🗑 {actor} o'chirdi",
+    "history.restored": "♻️ {actor} qayta tikladi",
+    "history.field.title": "nom",
+    "history.field.description": "tavsif",
+    "history.field.priority": "ustuvorlik",
+    "history.field.area": "yo'nalish",
+    "history.field.due": "muddat",
     # ---- assignee picker ----------------------------------------------------------------
     "picker.menu": "👥 <b>Kimga tayinlaymiz?</b> Guruhni tanlang:",
     "picker.group": "👥 <b>{specialty}</b> — ismni bosing (qayta bossangiz olib tashlanadi)",
@@ -162,6 +226,7 @@ MESSAGES: dict[str, str] = {
     "menu.done": "Vazifani tugatish",
     "menu.digest": "Kunlik xulosa",
     "menu.help": "Yordam",
+    "menu.find": "Vazifa qidirish",
     "menu.specialty": "Mutaxassislik tanlash",
     "menu.approve": "Vazifani tasdiqlash",
     "menu.reject": "Vazifani qaytarish",
@@ -232,6 +297,11 @@ MESSAGES: dict[str, str] = {
         "Mutaxassislik topilmadi: <code>{word}</code>.\n"
         "Mavjud: mobile, frontend, backend, pm, qa, devops, other."
     ),
+    "err.bad_time": (
+        "🕘 Vaqtni tushunmadim: <code>{value}</code>. "
+        "Misol: <code>/digest 09:00</code>, <code>/digest off</code>"
+    ),
+    "err.find_usage": "Qidirish uchun kamida 2 ta belgi yozing: <code>/find login</code>",
     "err.same_status": "ℹ️ Vazifa allaqachon shu holatda: {status}.",
     "err.self_approval": (
         "🔒 O'zingiz bajargan vazifani o'zingiz tasdiqlay olmaysiz. "
@@ -240,7 +310,10 @@ MESSAGES: dict[str, str] = {
     "err.stale_button": "Bu tugma eskirgan. Vazifani /info 12 kabi buyruq bilan qayta oching.",
     "err.task_gone": "🔎 Vazifa topilmadi (o'chirilgan bo'lishi mumkin).",
     "err.task_not_found": "🔎 <b>#{number}</b> raqamli vazifa topilmadi.",
-    "err.task_ref_required": "Vazifa raqamini yozing, masalan: <code>/done 12</code>",
+    "err.task_ref_required": (
+        "Vazifa raqamini yozing, masalan: <code>/done 12</code> — "
+        "yoki vazifa xabariga javob bering."
+    ),
     "err.title_too_long": "Sarlavha {max} belgidan oshmasligi kerak.",
     "err.unexpected": "⚠️ Kutilmagan xatolik yuz berdi. Keyinroq urinib ko'ring.",
     "err.unknown_area": "📂 «{slug}» yo'nalishi topilmadi. Ro'yxat: /areas",

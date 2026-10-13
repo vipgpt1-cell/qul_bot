@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     Column,
     Date,
     ForeignKey,
@@ -27,6 +28,7 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -46,6 +48,10 @@ class Workspace(Base):
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Tashkent")
     #: Last issued task number; bumped atomically so numbers are gap-free and race-free.
     task_counter: Mapped[int] = mapped_column(default=0)
+    #: Automatic daily digest: on/off, local time "HH:MM", and the last local date it was posted.
+    digest_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    digest_time: Mapped[str] = mapped_column(String(5), default="09:00", server_default="09:00")
+    last_digest_on: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -160,3 +166,5 @@ class TaskEvent(Base):
     type: Mapped[EventType] = mapped_column(str_enum(EventType, 32))
     data: Mapped[dict[str, Any]] = mapped_column(JSON, default=json_default)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+    actor: Mapped[User | None] = relationship(lazy="selectin")

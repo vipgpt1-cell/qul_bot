@@ -29,8 +29,10 @@ DONE_COMMAND = "done"
 REASON_COMMANDS = frozenset({"reject", "block", "cancel"})
 
 TASK_COMMANDS = ("task", "add")
-LIST_COMMANDS = ("list", "my", "review", "digest")
-EDIT_COMMANDS = ("info", "edit", "assign", "unassign", "comment", "delete", "restore")
+LIST_COMMANDS = ("list", "my", "review", "digest", "find")
+EDIT_COMMANDS = (
+    "info", "history", "edit", "assign", "unassign", "comment", "delete", "restore",
+)  # fmt: skip
 ADMIN_COMMANDS = ("areas", "addarea", "delarea", "team", "role", "specialty")
 PUBLIC_COMMANDS = ("start", "help", "chatid")
 
@@ -46,7 +48,7 @@ ALL_COMMANDS: tuple[str, ...] = (
 
 # What appears in Telegram's "/" menu. Aliases and rarely used commands stay out of it.
 _MENU_EVERYONE = (
-    "task", "list", "my", "review", "info", "doing", "done", "digest", "specialty", "help",
+    "task", "list", "my", "review", "find", "info", "doing", "done", "digest", "specialty", "help",
 )  # fmt: skip
 _MENU_ADMINS = ("approve", "reject", "assign", "edit", "areas", "addarea", "team", "role")
 

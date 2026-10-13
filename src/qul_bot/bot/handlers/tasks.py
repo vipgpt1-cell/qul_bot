@@ -20,14 +20,15 @@ from qul_bot.bot.formatting import (
     esc,
     mentions,
     render_card,
+    render_history,
     render_status_change,
     truncate,
     user_name,
 )
 from qul_bot.bot.handlers.helpers import (
-    parse_ref,
     replied_user,
     reply_to,
+    resolve_ref,
     resolve_usernames,
 )
 from qul_bot.bot.keyboards import confirm_delete_keyboard, task_keyboard
@@ -84,6 +85,8 @@ async def cmd_task(
     parsed = parse_task_input(command.args or "", ctx.today)
     title, description = parsed.title, parsed.description
     source = message.reply_to_message
+    if source is not None and source.from_user is not None and source.from_user.is_bot:
+        source = None  # replying to a bot card is not "make this message a task"
     source_message_id: int | None = None
 
     if source is not None:
@@ -140,8 +143,19 @@ async def _show(message: Message, ctx: RequestContext, session: AsyncSession, nu
 async def cmd_info(
     message: Message, command: CommandObject, session: AsyncSession, ctx: RequestContext
 ) -> None:
-    number, _ = parse_ref(command.args)
+    number, _ = resolve_ref(message, command.args)
     await _show(message, ctx, session, number)
+
+
+async def cmd_history(
+    message: Message, command: CommandObject, session: AsyncSession, ctx: RequestContext
+) -> None:
+    workspace = ctx.require_workspace()
+    number, _ = resolve_ref(message, command.args)
+    service = TaskService(session)
+    task = await service.get(workspace.id, number)
+    entries = await service.history(task.id)
+    await message.answer(render_history(ctx.t, task, entries, ctx.tz))
 
 
 async def cmd_task_shortcut(
@@ -159,7 +173,7 @@ async def cmd_edit(
     message: Message, command: CommandObject, session: AsyncSession, ctx: RequestContext
 ) -> None:
     workspace = ctx.require_workspace()
-    number, rest = parse_ref(command.args)
+    number, rest = resolve_ref(message, command.args)
     parsed = parse_task_input(rest, ctx.today)
     patch = patch_from_input(parsed)
     if patch.is_empty() and not parsed.assignees:
@@ -185,7 +199,7 @@ async def cmd_assign(
 ) -> None:
     """`/assign 42 @user`, or reply to a person's message, or just `/assign 42` for yourself."""
     workspace = ctx.require_workspace()
-    number, rest = parse_ref(command.args)
+    number, rest = resolve_ref(message, command.args)
     users = await resolve_usernames(session, ctx, parse_task_input(rest, ctx.today).assignees)
     if replied := await replied_user(session, ctx, message):
         users.append(replied)
@@ -213,7 +227,7 @@ async def cmd_comment(
     message: Message, command: CommandObject, session: AsyncSession, ctx: RequestContext
 ) -> None:
     workspace = ctx.require_workspace()
-    number, body = parse_ref(command.args)
+    number, body = resolve_ref(message, command.args)
     service = TaskService(session)
     task = await service.get(workspace.id, number)
     await service.comment(task.id, ctx.actor, body)
@@ -229,7 +243,7 @@ async def cmd_status(
 ) -> None:
     workspace = ctx.require_workspace()
     name = (command.command or "").lower()
-    number, rest = parse_ref(command.args)
+    number, rest = resolve_ref(message, command.args)
     service = TaskService(session)
     task = await service.get(workspace.id, number)
 
@@ -250,7 +264,7 @@ async def cmd_delete(
     message: Message, command: CommandObject, session: AsyncSession, ctx: RequestContext
 ) -> None:
     workspace = ctx.require_workspace()
-    number, _ = parse_ref(command.args)
+    number, _ = resolve_ref(message, command.args)
     task = await TaskService(session).get(workspace.id, number)
     state = TaskState(task.status, task.reporter_id, [u.id for u in task.assignees])
     if not can_delete(state, ctx.actor):
@@ -265,7 +279,7 @@ async def cmd_restore(
     message: Message, command: CommandObject, session: AsyncSession, ctx: RequestContext
 ) -> None:
     workspace = ctx.require_workspace()
-    number, _ = parse_ref(command.args)
+    number, _ = resolve_ref(message, command.args)
     task = await TaskService(session).restore(workspace.id, number, ctx.actor)
     await answer_card(message, ctx, session, task, header=ctx.t("restored.header", number=number))
 
@@ -273,6 +287,7 @@ async def cmd_restore(
 def register(router: Router) -> None:
     router.message.register(cmd_task, Command(*TASK_COMMANDS, ignore_case=True))
     router.message.register(cmd_info, Command("info", ignore_case=True))
+    router.message.register(cmd_history, Command("history", ignore_case=True))
     router.message.register(cmd_task_shortcut, Command(_TASK_SHORTCUT))
     router.message.register(cmd_edit, Command("edit", ignore_case=True))
     router.message.register(cmd_assign, Command("assign", "unassign", ignore_case=True))

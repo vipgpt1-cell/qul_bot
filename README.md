@@ -6,6 +6,8 @@ A Telegram group task tracker for IT teams. Turn a chat message into a task, fol
 * **Fast capture** – `/task Fix login crash #mobile @username !high muddat:friday`, or reply to
   any message with `/task`.
 * **A real review step** – developers finish into *review*; only a reviewer or admin approves.
+* **Hands-free upkeep** – a digest posts itself every working morning; reply to a task card
+  instead of typing its number; `/find` and `/history` answer "where is it?" and "what happened?".
 * **Calm in the group** – lists ping nobody; the bot edits cards in place and only mentions
   people when they must act.
 * **Built to grow** – every change is logged as an event, business logic is independent of
@@ -122,7 +124,12 @@ Everything else is the title; extra lines become the description. **Reply** to a
 | `/reopen 12` | done/cancelled → todo | reviewer/admin (done); anyone involved (cancelled) |
 | `/cancel 12 reason` | → cancelled | assignee, reporter, reviewer, admin (out of review: reviewer/admin) |
 
-Every task card also has buttons for these actions, plus **🙋 Me** and **🚦 Priority**.
+**No number needed:** *reply* to a task card (or to a status notice) with `/done`, `/doing`,
+`/comment text`, `/assign @user`, `/info`, … and the bot uses that task. A number you type
+explicitly always wins.
+
+Every task card also has buttons for these actions, plus **🙋 Me**, **👥 Assign** and
+**🚦 Priority**.
 Mentions happen only when someone must act: reviewers are pinged when work enters review, assignees
 when it is approved or sent back.
 
@@ -135,6 +142,8 @@ when it is approved or sent back.
 | `/review` | tasks waiting for review |
 | `/mobile` | any area name works as a shortcut |
 | `/digest` | overdue, due today, in review, blocked, unassigned |
+| `/find text` | search titles and descriptions, including finished tasks |
+| `/history 12` | what happened to a task, and who did it |
 | `/info 12` or `/t12` | one task with comments (`/t12` is tappable in lists) |
 
 ### Editing
@@ -144,6 +153,24 @@ or just `/assign 12` for yourself) · `/unassign 12 @user` · `/comment 12 text`
 `/delete 12` (asks first; admin or author) · `/restore 12` (admin).
 
 Use `#-` or `muddat:-` in `/edit` to clear the area or the deadline.
+
+### Automatic daily digest
+
+Every **working day (Mon–Fri) at 09:00** (workspace timezone) the bot posts the digest into the
+group — but only when there is something to report (overdue, due today, waiting for review,
+blocked, or unassigned). Admins control it:
+
+| Command | Effect |
+|---|---|
+| `/digest 08:30` | move it to another time (and switch it on) |
+| `/digest off` / `/digest on` | disable / enable |
+
+If the bot was down at the scheduled time it still posts within 3 hours; later than that it skips
+the day rather than sending a stale "morning" digest. It posts at most once per day.
+
+### Help
+
+`/help` is a short menu with four sections (create, workflow, view/search, team) that open in place.
 
 ### Team specialties and picking assignees
 

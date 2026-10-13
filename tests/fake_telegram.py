@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import html
+import re
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
@@ -149,6 +151,19 @@ class Harness:
             from_user=user,
             text=text,
             reply_to_message=reply_to,
+        )
+
+    def last_bot_message(self) -> Message:
+        """The bot's latest message as Telegram would deliver it (plain text, no HTML tags)."""
+        last = self.session.last_message
+        assert last is not None, "the bot has not sent anything yet"
+        plain = html.unescape(re.sub(r"<[^>]+>", "", last.text))
+        return Message(
+            message_id=9000,
+            date=datetime.now(UTC),
+            chat=Chat(id=int(last.chat_id), type="supergroup"),
+            from_user=User(id=BOT_ID, is_bot=True, first_name="Qul"),
+            text=plain,
         )
 
     async def say(self, user: User, text: str, **kwargs: Any) -> Message:

@@ -9,6 +9,7 @@ from qul_bot.bot.callbacks import (
     ACTION_ME,
     ACTION_PRIORITY,
     AssignPick,
+    HelpPage,
     SpecialtyPick,
     TaskAction,
     encode_filter,
@@ -141,3 +142,19 @@ def specialty_keyboard(t: Translator) -> InlineKeyboardMarkup:
         text=t("btn.specialty_clear"), callback_data=SpecialtyPick(code=0).pack()
     )
     return InlineKeyboardMarkup(inline_keyboard=[*_pairs(buttons), [clear]])
+
+
+HELP_PAGES = ("create", "workflow", "view", "team")
+
+
+def help_keyboard(t: Translator) -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(text=t(f"help.btn.{page}"), callback_data=HelpPage(page=page).pack())
+        for page in HELP_PAGES
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=_pairs(buttons))
+
+
+def help_back_keyboard(t: Translator) -> InlineKeyboardMarkup:
+    back = InlineKeyboardButton(text=t("btn.back"), callback_data=HelpPage(page="main").pack())
+    return InlineKeyboardMarkup(inline_keyboard=[[back]])

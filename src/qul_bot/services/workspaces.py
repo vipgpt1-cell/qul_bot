@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import time
+
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qul_bot.db.models import Area, Membership, Task, User, Workspace
 from qul_bot.domain.areas import normalize_slug
 from qul_bot.domain.enums import ACTIVE_STATUSES, Role
+from qul_bot.domain.schedule import format_clock
 from qul_bot.domain.specialty import Specialty
 from qul_bot.errors import InputError, NotFoundError, PermissionDenied
 
@@ -48,6 +51,16 @@ class WorkspaceService:
             .execution_options(synchronize_session=False)
         )
         return int(result.scalar_one())
+
+    async def configure_digest(
+        self, workspace: Workspace, *, enabled: bool | None = None, at: time | None = None
+    ) -> Workspace:
+        """Turn the automatic digest on/off and/or move it to another local time."""
+        if enabled is not None:
+            workspace.digest_enabled = enabled
+        if at is not None:
+            workspace.digest_time = format_clock(at)
+        return workspace
 
     async def migrate_chat(self, old_chat_id: int, new_chat_id: int) -> None:
         """A basic group was upgraded to a supergroup: Telegram gives it a new chat id."""

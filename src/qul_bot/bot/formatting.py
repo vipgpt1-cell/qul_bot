@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import html
 from collections.abc import Iterable, Sequence
-from datetime import date
+from datetime import date, tzinfo
 
 from qul_bot.db.models import Membership, Task, TaskComment, User
-from qul_bot.domain.enums import ACTIVE_STATUSES, Priority, Role, TaskStatus
+from qul_bot.domain.enums import ACTIVE_STATUSES, EventType, Priority, Role, TaskStatus
 from qul_bot.domain.specialty import SPECIALTY_ORDER, Specialty
 from qul_bot.i18n import Translator
-from qul_bot.services.tasks import Digest, StatusChange, TaskPage
+from qul_bot.services.tasks import Digest, HistoryEntry, StatusChange, TaskPage
 
 STATUS_EMOJI: dict[TaskStatus, str] = {
     TaskStatus.TODO: "⚪",
@@ -287,4 +287,50 @@ def render_status_change(
         others = [u for u in task.assignees if u.id != actor.id]
         if others:
             lines.append(t("notify.assignees", users=mentions(others)))
+    return "\n".join(lines)
+
+
+# ---- history --------------------------------------------------------------------------
+
+
+def _describe_event(t: Translator, entry: HistoryEntry) -> str:
+    event, actor = entry.event, esc(entry.actor_name)
+    data = event.data
+    subject = esc(entry.subject_name or "—")
+    match event.type:
+        case EventType.CREATED:
+            return t("history.created", actor=actor)
+        case EventType.STATUS_CHANGED:
+            line = t(
+                "history.status",
+                actor=actor,
+                source=status_label(t, TaskStatus(data["source"])),
+                target=status_label(t, TaskStatus(data["target"])),
+            )
+            if data.get("reason"):
+                line += t("history.reason", reason=esc(truncate(str(data["reason"]), 120)))
+            return line
+        case EventType.ASSIGNED if data.get("auto"):
+            return t("history.auto_assigned", actor=actor)
+        case EventType.ASSIGNED:
+            return t("history.assigned", actor=actor, user=subject)
+        case EventType.UNASSIGNED:
+            return t("history.unassigned", actor=actor, user=subject)
+        case EventType.EDITED:
+            fields = ", ".join(t(f"history.field.{name}") for name in data.get("changes", {}))
+            return t("history.edited", actor=actor, fields=fields)
+        case EventType.COMMENTED:
+            return t("history.commented", actor=actor)
+        case EventType.DELETED:
+            return t("history.deleted", actor=actor)
+        case EventType.RESTORED:
+            return t("history.restored", actor=actor)
+    return actor
+
+
+def render_history(t: Translator, task: Task, entries: Sequence[HistoryEntry], tz: tzinfo) -> str:
+    lines = [t("history.title", number=task.number, title=esc(truncate(task.title, 80))), ""]
+    for entry in entries:
+        when = entry.event.created_at.astimezone(tz).strftime("%d.%m %H:%M")
+        lines.append(f"<code>{when}</code> {_describe_event(t, entry)}")
     return "\n".join(lines)

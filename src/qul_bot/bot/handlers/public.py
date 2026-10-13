@@ -7,12 +7,31 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from qul_bot.bot.callbacks import HelpPage
+from qul_bot.bot.handlers.helpers import safe_edit
+from qul_bot.bot.keyboards import HELP_PAGES, help_back_keyboard, help_keyboard
 from qul_bot.i18n import DEFAULT_LOCALE, Translator
 from qul_bot.services.workspaces import WorkspaceService
 
 
 async def cmd_help(message: Message) -> None:
-    await message.answer(Translator(DEFAULT_LOCALE)("help.text"))
+    t = Translator(DEFAULT_LOCALE)
+    await message.answer(t("help.main"), reply_markup=help_keyboard(t))
+
+
+async def on_help_page(callback: CallbackQuery, callback_data: HelpPage) -> None:
+    """Switch between the help menu and its sections by editing the message in place."""
+    t = Translator(DEFAULT_LOCALE)
+    page = callback_data.page
+    if not isinstance(callback.message, Message) or (page != "main" and page not in HELP_PAGES):
+        await callback.answer()
+        return
+    if page == "main":
+        text, markup = t("help.main"), help_keyboard(t)
+    else:
+        text, markup = t(f"help.page.{page}"), help_back_keyboard(t)
+    await callback.answer()
+    await safe_edit(callback.message, text, markup)
 
 
 async def cmd_chatid(message: Message) -> None:
@@ -44,3 +63,4 @@ def register(router: Router) -> None:
     router.message.register(on_migrate_to, F.migrate_to_chat_id)
     router.message.register(on_migrate_from, F.migrate_from_chat_id)
     router.callback_query.register(on_noop, F.data == "noop")
+    router.callback_query.register(on_help_page, HelpPage.filter())

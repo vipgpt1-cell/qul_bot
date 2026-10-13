@@ -16,13 +16,16 @@ from qul_bot.bot.formatting import (
     render_digest,
     render_task_list,
     status_label,
+    truncate,
 )
+from qul_bot.bot.handlers.helpers import require_admin
 from qul_bot.bot.keyboards import pagination_keyboard
-from qul_bot.db.models import User
+from qul_bot.db.models import User, Workspace
 from qul_bot.domain.enums import TaskStatus
+from qul_bot.domain.schedule import parse_clock
 from qul_bot.errors import InputError, NotFoundError
 from qul_bot.i18n import Translator
-from qul_bot.parsing.task_input import ListInput, parse_list_input
+from qul_bot.parsing.task_input import ListInput, normalize_apostrophes, parse_list_input
 from qul_bot.services.tasks import DIGEST_SECTION_LIMIT, TaskFilter, TaskService
 from qul_bot.services.workspaces import WorkspaceService
 
@@ -122,10 +125,56 @@ async def cmd_review(
     await send_list(message, session, ctx, flt)
 
 
-async def cmd_digest(message: Message, session: AsyncSession, ctx: RequestContext) -> None:
+_DIGEST_OFF = frozenset({"off", "ochirish", "o'chirish", "stop", "-"})
+_DIGEST_ON = frozenset({"on", "yoqish"})
+
+
+def _schedule_line(t: Translator, workspace: Workspace) -> str:
+    if not workspace.digest_enabled:
+        return t("digest.schedule_off")
+    return t("digest.schedule_on", time=workspace.digest_time, tz=esc(workspace.timezone))
+
+
+async def cmd_digest(
+    message: Message, command: CommandObject, session: AsyncSession, ctx: RequestContext
+) -> None:
+    """`/digest` shows the digest now. `/digest 09:00`, `/digest on|off` (admin) schedule it."""
     workspace = ctx.require_workspace()
+    arg = normalize_apostrophes((command.args or "").strip()).lower()
+    if arg:
+        require_admin(ctx)
+        enabled, at = True, None
+        if arg in _DIGEST_OFF:
+            enabled = False
+        elif arg not in _DIGEST_ON:
+            at = parse_clock(arg)
+        await WorkspaceService(session).configure_digest(workspace, enabled=enabled, at=at)
+        await message.answer(
+            ctx.t("digest.disabled")
+            if not enabled
+            else ctx.t("digest.enabled", time=workspace.digest_time, tz=esc(workspace.timezone))
+        )
+        return
     digest = await TaskService(session).digest(workspace.id, ctx.today)
-    await message.answer(render_digest(ctx.t, digest, ctx.today, DIGEST_SECTION_LIMIT))
+    body = render_digest(ctx.t, digest, ctx.today, DIGEST_SECTION_LIMIT)
+    await message.answer(f"{body}\n\n{_schedule_line(ctx.t, workspace)}")
+
+
+async def cmd_find(
+    message: Message, command: CommandObject, session: AsyncSession, ctx: RequestContext
+) -> None:
+    """`/find login`: search titles and descriptions, including finished tasks."""
+    workspace = ctx.require_workspace()
+    query = (command.args or "").strip()
+    page = await TaskService(session).search(workspace.id, query)
+    shown = esc(truncate(query, 40))
+    if page.total == 0:
+        await message.answer(ctx.t("find.empty", query=shown))
+        return
+    text = render_task_list(ctx.t, page, ctx.t("find.title", query=shown), ctx.today)
+    if page.total > len(page.items):
+        text += "\n\n" + ctx.t("find.more", count=page.total - len(page.items))
+    await message.answer(text)
 
 
 async def cmd_area_shortcut(
@@ -154,6 +203,7 @@ def register(router: Router) -> None:
     router.message.register(cmd_my, Command("my", ignore_case=True))
     router.message.register(cmd_review, Command("review", ignore_case=True))
     router.message.register(cmd_digest, Command("digest", ignore_case=True))
+    router.message.register(cmd_find, Command("find", ignore_case=True))
 
 
 def register_shortcuts(router: Router) -> None:

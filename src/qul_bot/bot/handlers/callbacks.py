@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from aiogram import Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +27,7 @@ from qul_bot.bot.formatting import (
     render_task_list,
     specialty_label,
 )
+from qul_bot.bot.handlers.helpers import safe_edit as _edit
 from qul_bot.bot.handlers.lists import PAGE_SIZE, list_title
 from qul_bot.bot.keyboards import (
     assign_group_keyboard,
@@ -49,14 +49,6 @@ _NEXT_PRIORITY = {
     Priority.HIGH: Priority.URGENT,
     Priority.URGENT: Priority.LOW,
 }
-
-
-async def _edit(message: Message, text: str, reply_markup: object = None) -> None:
-    try:
-        await message.edit_text(text, reply_markup=reply_markup)  # type: ignore[arg-type]
-    except TelegramBadRequest as exc:
-        if "message is not modified" not in str(exc):
-            raise
 
 
 async def _refresh_card(

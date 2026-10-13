@@ -17,7 +17,7 @@ SRC = Path(__file__).parents[1] / "src" / "qul_bot"
 NAMESPACES = {
     "help", "chatid", "status", "priority", "role", "created", "edited", "restored", "card",
     "btn", "toast", "changed", "notify", "assigned", "unassigned", "comment", "delete", "list",
-    "digest", "areas", "area", "team", "menu", "err", "picker", "specialty",
+    "digest", "areas", "area", "team", "menu", "err", "picker", "specialty", "find", "history",
 }  # fmt: skip
 TELEGRAM_TAGS = {"b", "i", "u", "s", "code", "pre", "a"}
 
@@ -63,7 +63,18 @@ def test_dynamic_key_families_are_complete() -> None:
 
 def test_no_unused_messages() -> None:
     text = "\n".join(p.read_text() for p in source_files())
-    dynamic_prefixes = ("status.", "changed.", "priority.", "role.", "menu.", "err.", "specialty.")
+    dynamic_prefixes = (
+        "status.",
+        "changed.",
+        "priority.",
+        "role.",
+        "menu.",
+        "err.",
+        "specialty.",
+        "help.page.",
+        "help.btn.",
+        "history.field.",
+    )
     unused = [
         key
         for key in MESSAGES

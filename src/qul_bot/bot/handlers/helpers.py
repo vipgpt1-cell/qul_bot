@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message, ReplyParameters
 from aiogram.types import User as TelegramUser
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,36 @@ def parse_ref(args: str | None) -> tuple[int, str]:
     if not match:
         raise InputError("task_ref_required")
     return int(match.group(1)), (match.group(2) or "").strip()
+
+
+_CARD_NUMBER_RE = re.compile(r"#(\d{1,9})\b")
+
+
+def resolve_ref(message: Message, args: str | None) -> tuple[int, str]:
+    """The task number and the remaining text of a command.
+
+    An explicit number (`/done 12`) always wins. Without one, a command that *replies to a
+    message of the bot* (a task card or a status notice) refers to the task shown there, so
+    `/done`, `/comment text` or `/assign @user` work on a card without typing its number.
+    """
+    try:
+        return parse_ref(args)
+    except InputError:
+        source = message.reply_to_message
+        from_bot = source is not None and source.from_user is not None and source.from_user.is_bot
+        match = _CARD_NUMBER_RE.search(source.text or "") if source and from_bot else None
+        if match:
+            return int(match.group(1)), (args or "").strip()
+        raise
+
+
+async def safe_edit(message: Message, text: str, reply_markup: object = None) -> None:
+    """Edit a message, ignoring Telegram's "message is not modified" complaint."""
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)  # type: ignore[arg-type]
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc):
+            raise
 
 
 def reply_to(message_id: int | None) -> ReplyParameters | None:
