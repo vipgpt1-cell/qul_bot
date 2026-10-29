@@ -266,6 +266,34 @@ MESSAGES: dict[str, str] = {
     "qa.hint": "Admin: <code>/qa on</code> yoki <code>/qa off</code>",
     "files.none": "📎 <b>#{number}</b> da ilova yo'q.",
     "files.caption": "📎 #{number} — {title}",
+    # ---- app builds -------------------------------------------------------------------
+    "app.reading": "📦 Build o'qilmoqda…",
+    "app.title": "📦 <b>{name}</b> · {platform}",
+    "app.version": "🏷 Versiya: <b>{version}</b>{build}",
+    "app.os": "📱 Minimal: {min} · Target: {target}",
+    "app.size": "💾 Hajmi: {size}",
+    "app.signing": "🔐 Imzo: {schemes} · {signer} · SHA-256 {sha}",
+    "app.unsigned": "🔐 Imzo: <b>yo'q</b>",
+    "app.permissions": "🛡 Ruxsatlar: {count} (sezgir: {sensitive})",
+    "app.profile": "🍏 Tarqatish: {kind} · Jamoa: {team} · Profil muddati: {expires}",
+    "app.devices": "📲 Ruxsat berilgan qurilmalar: {count}",
+    "app.distribution.development": "development",
+    "app.distribution.ad-hoc": "ad-hoc",
+    "app.distribution.enterprise": "enterprise",
+    "app.distribution.app-store": "App Store",
+    "app.warnings": "⚠️ <b>Diqqat:</b>",
+    "app.all_good": "✅ Jiddiy muammo topilmadi.",
+    "app.release": "🏷 {release} relizida {count} ta vazifa: /release {release}",
+    "app.warn.debuggable": "<b>debuggable</b> yoqilgan — bu build relizga chiqmasligi kerak",
+    "app.warn.debug_signed": "<b>Debug kalit</b> bilan imzolangan — Google Play qabul qilmaydi",
+    "app.warn.unsigned": "Imzolanmagan — telefonga o'rnatilmaydi",
+    "app.warn.no_v2": "Faqat v1 imzo — Android 11+ uchun v2 imzo shart",
+    "app.warn.old_target": "targetSdk eski — Google Play kamida API 35 talab qiladi",
+    "app.warn.cleartext": "Shifrlanmagan HTTP ruxsat etilgan (usesCleartextTraffic)",
+    "app.warn.cert_expired": "Imzo sertifikati muddati o'tgan",
+    "app.warn.ios_development": "Development profil — faqat dasturchilar qurilmasida ishlaydi",
+    "app.warn.profile_expired": "Provisioning profil muddati <b>o'tgan</b> — ilova ochilmaydi",
+    "app.warn.profile_expires_soon": "Provisioning profil muddati 2 haftadan kam qoldi",
     # ---- areas & team -------------------------------------------------------------------
     "areas.title": "📂 <b>Yo'nalishlar</b>",
     "areas.empty": (
@@ -299,6 +327,7 @@ MESSAGES: dict[str, str] = {
     "menu.check": "Tekshiruv ro'yxati",
     "menu.release": "Reliz hisoboti",
     "menu.qa": "QA bosqichi sozlamasi",
+    "menu.apk": "Build (APK/IPA) tekshiruvi",
     "menu.specialty": "Mutaxassislik tanlash",
     "menu.approve": "Vazifani tasdiqlash",
     "menu.reject": "Vazifani qaytarish",
@@ -388,6 +417,18 @@ MESSAGES: dict[str, str] = {
     "err.qa_required": "🧪 Bu vazifa avval testdan o'tishi kerak (QA bosqichi yoqilgan).",
     "err.tester_required": "🧪 Testdagi vazifani faqat QA yoki admin o'tkazadi yoki qaytaradi.",
     "err.qa_usage": "Foydalanish: <code>/qa on</code> yoki <code>/qa off</code>",
+    "err.app_usage": (
+        "📦 .apk yoki .ipa faylni <code>/apk</code> izohi bilan yuboring, "
+        "yoki fayl xabariga javob berib <code>/apk</code> yozing."
+    ),
+    "err.app_aab": "📦 .aab (App Bundle) o'qilmaydi — undan .apk yig'ib yuboring.",
+    "err.app_unsupported": "📦 Faqat .apk va .ipa fayllar tekshiriladi.",
+    "err.app_too_big": (
+        "📦 Fayl juda katta (chegara {limit} MB). Telegram botlarga 20 MB gacha fayl beradi; "
+        "kattaroq uchun lokal Bot API serverini ulang (README)."
+    ),
+    "err.app_unreadable": "📦 Faylni o'qib bo'lmadi: bu yaroqli .apk/.ipa emas yoki buzilgan.",
+    "err.app_timeout": "📦 Faylni tekshirish juda uzoq davom etdi. Keyinroq urinib ko'ring.",
     "err.same_status": "ℹ️ Vazifa allaqachon shu holatda: {status}.",
     "err.self_approval": (
         "🔒 O'zingiz bajargan vazifani o'zingiz tasdiqlay olmaysiz. "

@@ -56,6 +56,11 @@ class Settings(DatabaseSettings):
     default_timezone: str = "Asia/Tashkent"
     default_locale: str = "uz"
     log_level: str = "INFO"
+    #: A self-hosted Telegram Bot API server (https://github.com/tdlib/telegram-bot-api).
+    #: The public API only lets bots download files up to 20 MB; a local server allows 2 GB.
+    telegram_api_url: str | None = None
+    #: Largest app build (.apk/.ipa) the bot will download and inspect.
+    max_app_size_mb: int = 20
 
     @field_validator("allowed_chat_ids", "admin_user_ids", mode="before")
     @classmethod

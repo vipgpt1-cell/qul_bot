@@ -10,6 +10,7 @@ import html
 from collections.abc import Iterable, Sequence
 from datetime import date, tzinfo
 
+from qul_bot.apps.report import AppReport, Platform
 from qul_bot.db.models import ChecklistItem, Membership, Task, TaskComment, User
 from qul_bot.domain.enums import (
     ACTIVE_STATUSES,
@@ -429,4 +430,84 @@ def render_release_report(t: Translator, report: ReleaseReport, today: date) -> 
         lines += [render_task_line(t, task, today) for task in pending[:15]]
         if len(pending) > 15:
             lines.append(t("digest.more", count=len(pending) - 15))
+    return "\n".join(lines)
+
+
+# ---- app builds -----------------------------------------------------------------------
+
+
+def format_size(size: int) -> str:
+    return f"{size / (1 << 20):.1f} MB" if size >= 1 << 20 else f"{max(1, size // 1024)} KB"
+
+
+def _short_permission(name: str) -> str:
+    return name.removeprefix("android.permission.")
+
+
+def render_app_report(
+    t: Translator, report: AppReport, file_name: str, release_tasks: int | None = None
+) -> str:
+    platform = "Android" if report.platform is Platform.ANDROID else "iOS"
+    title = esc(report.name or report.identifier or file_name)
+    lines = [t("app.title", name=title, platform=platform)]
+    if report.identifier:
+        lines.append(f"<code>{esc(report.identifier)}</code>")
+    lines.append("")
+    if report.version_name or report.version_code:
+        version = esc(report.version_name or "?")
+        build = f" ({esc(report.version_code)})" if report.version_code else ""
+        lines.append(t("app.version", version=version, build=build))
+    if report.min_os or report.target_os:
+        lines.append(
+            t("app.os", min=esc(report.min_os or "?"), target=esc(report.target_os or "?"))
+        )
+    size = t("app.size", size=format_size(report.size))
+    if report.abis:
+        size += " · ABI: " + esc(", ".join(report.abis))
+    lines.append(size)
+
+    signing = report.signing
+    if signing is not None:
+        if signing.schemes:
+            who = esc(signing.certificate.common_name or "?") if signing.certificate else "?"
+            print_ = signing.certificate.fingerprint if signing.certificate else ""
+            short = f"{print_[:11]}…{print_[-5:]}" if print_ else "—"
+            lines.append(
+                t("app.signing", schemes=", ".join(signing.schemes), signer=who, sha=short)
+            )
+        else:
+            lines.append(t("app.unsigned"))
+    if report.platform is Platform.ANDROID:
+        lines.append(
+            t(
+                "app.permissions",
+                count=len(report.permissions),
+                sensitive=len(report.dangerous_permissions),
+            )
+        )
+        if report.dangerous_permissions:
+            names = ", ".join(_short_permission(p) for p in report.dangerous_permissions[:12])
+            more = len(report.dangerous_permissions) - 12
+            lines.append(f"   <i>{esc(names)}{f' +{more}' if more > 0 else ''}</i>")
+    if report.distribution:
+        expires = report.profile_expires.strftime("%d.%m.%Y") if report.profile_expires else "—"
+        lines.append(
+            t(
+                "app.profile",
+                kind=t(f"app.distribution.{report.distribution}"),
+                team=esc(report.team or "—"),
+                expires=expires,
+            )
+        )
+        if report.devices:
+            lines.append(t("app.devices", count=report.devices))
+
+    lines.append("")
+    if report.warnings:
+        lines.append(t("app.warnings"))
+        lines += [f"• {t(f'app.warn.{w.value}')}" for w in report.warnings]
+    else:
+        lines.append(t("app.all_good"))
+    if release_tasks and report.version_name:
+        lines += ["", t("app.release", release=esc(report.version_name), count=release_tasks)]
     return "\n".join(lines)

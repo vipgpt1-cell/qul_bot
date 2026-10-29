@@ -18,7 +18,7 @@ NAMESPACES = {
     "help", "chatid", "status", "priority", "role", "created", "edited", "restored", "card",
     "btn", "toast", "changed", "notify", "assigned", "unassigned", "comment", "delete", "list",
     "digest", "areas", "area", "team", "menu", "err", "picker", "specialty", "find", "history",
-    "bug", "check", "release", "qa", "files", "kind",
+    "bug", "check", "release", "qa", "files", "kind", "app",
 }  # fmt: skip
 TELEGRAM_TAGS = {"b", "i", "u", "s", "code", "pre", "a"}
 
@@ -77,6 +77,8 @@ def test_no_unused_messages() -> None:
         "history.field.",
         "bug.field.",
         "bug.severity.",
+        "app.warn.",
+        "app.distribution.",
     )
     unused = [
         key

@@ -18,6 +18,7 @@ from aiogram.methods import (
     AnswerCallbackQuery,
     EditMessageText,
     GetChatMember,
+    GetFile,
     GetMe,
     SendMessage,
     TelegramMethod,
@@ -27,6 +28,8 @@ from aiogram.types import (
     Chat,
     ChatMemberMember,
     ChatMemberOwner,
+    Document,
+    File,
     InlineKeyboardMarkup,
     Message,
     PhotoSize,
@@ -49,12 +52,21 @@ class FakeSession(BaseSession):
         self.chat_admins: set[int] = set()
         #: Survives reset(): buttons are pressed on the bot's latest message.
         self.last_message: SendMessage | None = None
+        #: Documents users "uploaded": file id -> bytes.
+        self.files: dict[str, bytes] = {}
         self._next_message_id = 5000
 
     async def close(self) -> None:
         return None
 
-    async def stream_content(self, *args: Any, **kwargs: Any) -> AsyncGenerator[bytes, None]:
+    async def stream_content(
+        self, url: str, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[bytes, None]:
+        """Serve bytes registered in `files` (what `bot.download` fetches)."""
+        for file_id, data in self.files.items():
+            if url.endswith(f"/files/{file_id}"):
+                yield data
+                return
         yield b""
 
     async def make_request(
@@ -69,20 +81,21 @@ class FakeSession(BaseSession):
         if isinstance(method, SendMessage):
             self.last_message = method
             self._next_message_id += 1
+            # Like real aiogram, returned objects are bound to the bot (so .edit_text works).
             return Message(
                 message_id=self._next_message_id,
                 date=datetime.now(UTC),
                 chat=Chat(id=int(method.chat_id), type="supergroup"),
                 from_user=User(id=BOT_ID, is_bot=True, first_name="Qul"),
                 text=method.text,
-            )
+            ).as_(bot)
         if isinstance(method, EditMessageText):
             return Message(
                 message_id=int(method.message_id or 0),
                 date=datetime.now(UTC),
                 chat=Chat(id=int(method.chat_id or 0), type="supergroup"),
                 text=method.text,
-            )
+            ).as_(bot)
         if isinstance(method, GetChatMember):
             user = tg_user(method.user_id, None, "x")
             if method.user_id in self.chat_admins:
@@ -90,6 +103,13 @@ class FakeSession(BaseSession):
             return ChatMemberMember(user=user)
         if isinstance(method, AnswerCallbackQuery):
             return True
+        if isinstance(method, GetFile):
+            return File(
+                file_id=method.file_id,
+                file_unique_id=method.file_id,
+                file_size=len(self.files.get(method.file_id, b"")),
+                file_path=f"files/{method.file_id}",
+            )
         return True
 
     # ---- helpers for assertions ---------------------------------------------------------
@@ -147,15 +167,26 @@ class Harness:
         chat_type: str = "supergroup",
         reply_to: Message | None = None,
         photo: str | None = None,
+        document: tuple[str, bytes] | None = None,
     ) -> Message:
         """A user message; with `photo` (a file id) it is a photo with no text."""
         self._message_id += 1
+        attached = None
+        if document is not None:
+            file_name, data = document
+            file_id = f"doc-{self._message_id}"
+            self.session.files[file_id] = data
+            attached = Document(
+                file_id=file_id, file_unique_id=file_id, file_name=file_name, file_size=len(data)
+            )
         return Message(
             message_id=self._message_id,
             date=datetime.now(UTC),
             chat=Chat(id=chat_id, type=chat_type, title="IT Team" if chat_id < 0 else None),
             from_user=user,
-            text=None if photo else text,
+            text=None if photo or document else text,
+            caption=text if document and text else None,
+            document=attached,
             photo=[PhotoSize(file_id=photo, file_unique_id=photo, width=100, height=100)]
             if photo
             else None,
