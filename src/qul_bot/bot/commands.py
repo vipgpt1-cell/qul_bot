@@ -35,6 +35,7 @@ EDIT_COMMANDS = (
 )  # fmt: skip
 ADMIN_COMMANDS = ("areas", "addarea", "delarea", "team", "role", "specialty")
 PUBLIC_COMMANDS = ("start", "help", "chatid")
+QA_COMMANDS = ("bug", "bugs", "check", "release", "qa", "files")
 
 ALL_COMMANDS: tuple[str, ...] = (
     *PUBLIC_COMMANDS,
@@ -44,13 +45,17 @@ ALL_COMMANDS: tuple[str, ...] = (
     *STATUS_COMMANDS,
     DONE_COMMAND,
     *ADMIN_COMMANDS,
+    *QA_COMMANDS,
 )
 
 # What appears in Telegram's "/" menu. Aliases and rarely used commands stay out of it.
 _MENU_EVERYONE = (
-    "task", "list", "my", "review", "find", "info", "doing", "done", "digest", "specialty", "help",
+    "task", "bug", "list", "my", "review", "bugs", "find", "info", "doing", "done",
+    "check", "release", "digest", "specialty", "help",
 )  # fmt: skip
-_MENU_ADMINS = ("approve", "reject", "assign", "edit", "areas", "addarea", "team", "role")
+_MENU_ADMINS = (
+    "approve", "reject", "assign", "edit", "areas", "addarea", "team", "role", "qa",
+)  # fmt: skip
 
 
 def _commands(t: Translator, names: tuple[str, ...]) -> list[BotCommand]:

@@ -1,9 +1,9 @@
 """The task workflow: which status changes exist and who may perform them.
 
-    todo ─► doing ─► review ─► done
-      │       │         │        │
-      │       ▼         └─► doing (rejected)
-      └────► blocked          done ─► todo (reopen)
+    todo ─► doing ─► review ─► [testing] ─► done
+      │       │         │          │          │
+      │       ▼         └─► doing ◄┘ (sent back)
+      └────► blocked                  done ─► todo (reopen)
 
 Rules
 -----
@@ -11,7 +11,11 @@ Rules
   assignee yet) may move it forward: todo → doing → review.
 * Only a reviewer or admin may take a task *out of* review or done: approve it,
   send it back, or reopen it.
-* An assignee cannot approve their own task, unless they are an admin.
+* The QA step (testing) is active when the workspace has it enabled *and* the team has at
+  least one QA. Then an approved review goes to testing, and only a QA or an admin may move
+  a task out of testing.
+* Nobody approves their own work (review or testing), unless they are an admin.
+* A task with unchecked checklist items cannot be done.
 """
 
 from __future__ import annotations
@@ -28,7 +32,8 @@ TRANSITIONS: dict[TaskStatus, frozenset[TaskStatus]] = {
     S.TODO: frozenset({S.DOING, S.REVIEW, S.BLOCKED, S.CANCELLED}),
     S.DOING: frozenset({S.TODO, S.REVIEW, S.BLOCKED, S.CANCELLED}),
     S.BLOCKED: frozenset({S.TODO, S.DOING, S.CANCELLED}),
-    S.REVIEW: frozenset({S.DONE, S.DOING, S.CANCELLED}),
+    S.REVIEW: frozenset({S.DONE, S.TESTING, S.DOING, S.CANCELLED}),
+    S.TESTING: frozenset({S.DONE, S.DOING, S.CANCELLED}),
     S.DONE: frozenset({S.TODO}),
     S.CANCELLED: frozenset({S.TODO}),
 }
@@ -43,10 +48,16 @@ AUTO_ASSIGN_TARGETS = frozenset({S.DOING, S.REVIEW})
 class Actor:
     user_id: int
     role: Role
+    #: Has the QA specialty: may pass or fail tasks in testing.
+    is_qa: bool = False
 
     @property
     def can_approve(self) -> bool:
         return self.role in (Role.ADMIN, Role.REVIEWER)
+
+    @property
+    def can_test(self) -> bool:
+        return self.is_qa or self.role is Role.ADMIN
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +65,10 @@ class TaskState:
     status: TaskStatus
     reporter_id: int
     assignee_ids: Collection[int]
+    #: Is the QA step in force for this task's workspace?
+    qa_active: bool = False
+    #: Checklist items not ticked yet.
+    open_checks: int = 0
 
 
 def can_modify(task: TaskState, actor: Actor) -> bool:
@@ -71,9 +86,16 @@ def can_delete(task: TaskState, actor: Actor) -> bool:
     return actor.role is Role.ADMIN or actor.user_id == task.reporter_id
 
 
-def done_target(status: TaskStatus) -> TaskStatus:
-    """Where `/done` leads: developers finish into review, reviewers finish into done."""
-    return S.DONE if status is S.REVIEW else S.REVIEW
+def approve_target(status: TaskStatus, qa_active: bool) -> TaskStatus:
+    """Where approving leads: review goes to testing when QA is active, otherwise to done."""
+    return S.TESTING if status is S.REVIEW and qa_active else S.DONE
+
+
+def done_target(status: TaskStatus, qa_active: bool = False) -> TaskStatus:
+    """Where `/done` leads: developers finish into review; reviewers and QA approve."""
+    if status in (S.REVIEW, S.TESTING):
+        return approve_target(status, qa_active)
+    return S.REVIEW
 
 
 def check_transition(task: TaskState, target: TaskStatus, actor: Actor) -> None:
@@ -82,9 +104,27 @@ def check_transition(task: TaskState, target: TaskStatus, actor: Actor) -> None:
         raise WorkflowError("same_status", status=task.status.value)
     if target not in TRANSITIONS[task.status]:
         raise WorkflowError("invalid_transition", source=task.status.value, target=target.value)
-    if task.status in APPROVER_ONLY_SOURCES and not actor.can_approve:
-        raise PermissionDenied("approver_required")
-    if not can_modify(task, actor):
+
+    if task.status is S.TESTING:
+        if not actor.can_test:
+            raise PermissionDenied("tester_required")
+    elif task.status in APPROVER_ONLY_SOURCES:
+        if not actor.can_approve:
+            raise PermissionDenied("approver_required")
+    elif not can_modify(task, actor):
         raise PermissionDenied("not_involved")
-    if target is S.DONE and actor.user_id in task.assignee_ids and actor.role is not Role.ADMIN:
+
+    if target is S.TESTING and not task.qa_active:
+        raise WorkflowError("qa_inactive")
+    if (
+        task.status is S.REVIEW
+        and target is S.DONE
+        and task.qa_active
+        and actor.role is not Role.ADMIN
+    ):
+        raise WorkflowError("qa_required")
+    approving = target is S.DONE or (target is S.TESTING and task.status is S.REVIEW)
+    if approving and actor.user_id in task.assignee_ids and actor.role is not Role.ADMIN:
         raise PermissionDenied("self_approval")
+    if target is S.DONE and task.open_checks:
+        raise WorkflowError("checklist_incomplete", count=task.open_checks)

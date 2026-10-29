@@ -9,6 +9,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from qul_bot.bot.cards import card_text
 from qul_bot.bot.commands import (
     DONE_COMMAND,
     REASON_COMMANDS,
@@ -19,9 +20,7 @@ from qul_bot.bot.context import RequestContext
 from qul_bot.bot.formatting import (
     esc,
     mentions,
-    render_card,
     render_history,
-    render_status_change,
     truncate,
     user_name,
 )
@@ -32,9 +31,10 @@ from qul_bot.bot.handlers.helpers import (
     resolve_usernames,
 )
 from qul_bot.bot.keyboards import confirm_delete_keyboard, task_keyboard
+from qul_bot.bot.status import notice_for, target_for
 from qul_bot.db.models import Task
 from qul_bot.domain.enums import Priority
-from qul_bot.domain.workflow import TaskState, can_delete, done_target
+from qul_bot.domain.workflow import TaskState, can_delete
 from qul_bot.errors import InputError, PermissionDenied
 from qul_bot.parsing.task_input import MAX_TITLE_LENGTH, TaskInput, parse_task_input
 from qul_bot.services.tasks import NewTask, TaskPatch, TaskService
@@ -51,6 +51,8 @@ def patch_from_input(parsed: TaskInput) -> TaskPatch:
         clear_area=parsed.clear_area,
         due=parsed.due,
         clear_due=parsed.clear_due,
+        release=parsed.release,
+        clear_release=parsed.clear_release,
     )
 
 
@@ -64,8 +66,7 @@ async def answer_card(
     footer: str | None = None,
     reply_to_message_id: int | None = None,
 ) -> None:
-    comments = await TaskService(session).recent_comments(task.id)
-    text = render_card(ctx.t, task, ctx.today, comments, header)
+    text = await card_text(session, ctx.t, task, ctx.today, header)
     if footer:
         text += f"\n\n{footer}"
     await message.answer(
@@ -116,6 +117,7 @@ async def cmd_task(
             due=parsed.due,
             source_chat_id=message.chat.id if source_message_id else None,
             source_message_id=source_message_id,
+            release=parsed.release,
         ),
     )
     others = [u for u in task.assignees if u.id != ctx.user.id]
@@ -247,14 +249,10 @@ async def cmd_status(
     service = TaskService(session)
     task = await service.get(workspace.id, number)
 
-    target = done_target(task.status) if name == DONE_COMMAND else STATUS_COMMANDS[name]
+    target = await target_for(service, task, name)
     reason = rest if name in REASON_COMMANDS else None
     change = await service.change_status(task.id, ctx.actor, target, reason)
-
-    reviewers = await service.workspaces.reviewers(workspace.id)
-    await message.answer(
-        render_status_change(ctx.t, change, ctx.user, reason=reason, reviewers=reviewers)
-    )
+    await message.answer(await notice_for(service, ctx.t, change, ctx.user, reason))
 
 
 # ---- delete / restore -----------------------------------------------------------------

@@ -15,7 +15,8 @@ RESERVED_SLUGS = frozenset(
         "start", "help", "chatid", "task", "add", "list", "my", "review", "info", "edit",
         "assign", "unassign", "comment", "delete", "restore", "digest", "doing", "ready",
         "done", "approve", "reject", "block", "reopen", "cancel", "areas", "addarea",
-        "delarea", "team", "role", "specialty", "find", "history", "all",
+        "delarea", "team", "role", "specialty", "find", "history", "bug", "bugs", "check",
+        "release", "qa", "files", "all",
     }
 )  # fmt: skip
 

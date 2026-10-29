@@ -29,6 +29,7 @@ from aiogram.types import (
     ChatMemberOwner,
     InlineKeyboardMarkup,
     Message,
+    PhotoSize,
     Update,
     User,
 )
@@ -96,6 +97,9 @@ class FakeSession(BaseSession):
     def sent(self) -> list[SendMessage]:
         return [c for c in self.calls if isinstance(c, SendMessage)]
 
+    def calls_of(self, method: type[Any]) -> list[Any]:
+        return [c for c in self.calls if isinstance(c, method)]
+
     def edited(self) -> list[EditMessageText]:
         return [c for c in self.calls if isinstance(c, EditMessageText)]
 
@@ -142,14 +146,19 @@ class Harness:
         chat_id: int = GROUP_ID,
         chat_type: str = "supergroup",
         reply_to: Message | None = None,
+        photo: str | None = None,
     ) -> Message:
+        """A user message; with `photo` (a file id) it is a photo with no text."""
         self._message_id += 1
         return Message(
             message_id=self._message_id,
             date=datetime.now(UTC),
             chat=Chat(id=chat_id, type=chat_type, title="IT Team" if chat_id < 0 else None),
             from_user=user,
-            text=text,
+            text=None if photo else text,
+            photo=[PhotoSize(file_id=photo, file_unique_id=photo, width=100, height=100)]
+            if photo
+            else None,
             reply_to_message=reply_to,
         )
 

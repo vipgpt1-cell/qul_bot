@@ -5,6 +5,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from qul_bot.db.models import Membership, User, Workspace
+from qul_bot.domain.specialty import Specialty
 from qul_bot.domain.workflow import Actor
 from qul_bot.errors import AppError
 from qul_bot.i18n import Translator
@@ -33,4 +34,9 @@ class RequestContext:
     def actor(self) -> Actor:
         if self.membership is None:
             raise AppError("no_workspace")
-        return Actor(user_id=self.user.id, role=self.membership.role)
+        return actor_for(self.user.id, self.membership)
+
+
+def actor_for(user_id: int, membership: Membership) -> Actor:
+    """The workflow's view of a member: their role, and whether they test (QA)."""
+    return Actor(user_id=user_id, role=membership.role, is_qa=membership.specialty is Specialty.QA)

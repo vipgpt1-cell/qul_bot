@@ -4,18 +4,21 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from qul_bot.bot.callbacks import (
     ACTION_ASSIGN,
+    ACTION_CHECKS,
     ACTION_DELETE_NO,
     ACTION_DELETE_YES,
     ACTION_ME,
     ACTION_PRIORITY,
     AssignPick,
+    BugSeverity,
+    CheckToggle,
     HelpPage,
     SpecialtyPick,
     TaskAction,
     encode_filter,
 )
 from qul_bot.bot.formatting import group_by_specialty, specialty_label, truncate
-from qul_bot.db.models import Membership, Task
+from qul_bot.db.models import ChecklistItem, Membership, Task
 from qul_bot.domain.enums import TaskStatus
 from qul_bot.domain.specialty import SPECIALTY_ORDER, Specialty, to_code
 from qul_bot.i18n import Translator
@@ -29,6 +32,7 @@ _PRIMARY: dict[TaskStatus, list[tuple[str, str]]] = {
     S.TODO: [("start", "btn.start"), ("ready", "btn.ready")],
     S.DOING: [("ready", "btn.ready"), ("block", "btn.block")],
     S.REVIEW: [("approve", "btn.approve"), ("reject", "btn.reject")],
+    S.TESTING: [("approve", "btn.test_pass"), ("reject", "btn.test_fail")],
     S.BLOCKED: [("start", "btn.resume"), ("cancel", "btn.cancel")],
     S.DONE: [("reopen", "btn.reopen")],
     S.CANCELLED: [("reopen", "btn.reopen")],
@@ -51,6 +55,8 @@ def task_keyboard(t: Translator, task: Task) -> InlineKeyboardMarkup:
                 button(ACTION_PRIORITY, "btn.priority"),
             ]
         )
+    if task.status not in (S.DONE, S.CANCELLED):
+        rows.append([button(ACTION_CHECKS, "btn.checklist")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -158,3 +164,31 @@ def help_keyboard(t: Translator) -> InlineKeyboardMarkup:
 def help_back_keyboard(t: Translator) -> InlineKeyboardMarkup:
     back = InlineKeyboardButton(text=t("btn.back"), callback_data=HelpPage(page="main").pack())
     return InlineKeyboardMarkup(inline_keyboard=[[back]])
+
+
+BUG_SEVERITIES = ("critical", "major", "minor", "trivial")
+
+
+def severity_keyboard(t: Translator) -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(
+            text=t(f"bug.severity.{level}"), callback_data=BugSeverity(level=level).pack()
+        )
+        for level in BUG_SEVERITIES
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=_pairs(buttons))
+
+
+def checklist_keyboard(items: list[ChecklistItem]) -> InlineKeyboardMarkup | None:
+    if not items:
+        return None
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=f"{'✅' if item.done else '⬜'} {n}. {truncate(item.text, 40)}",
+                callback_data=CheckToggle(item_id=item.id).pack(),
+            )
+        ]
+        for n, item in enumerate(items, 1)
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)

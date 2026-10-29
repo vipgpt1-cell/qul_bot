@@ -151,6 +151,15 @@ class WorkspaceService:
         membership.specialty = specialty
         return membership
 
+    async def testers(self, workspace_id: int) -> list[User]:
+        """Members with the QA specialty."""
+        members = await self.list_members(workspace_id)
+        return [m.user for m in members if m.specialty is Specialty.QA]
+
+    async def configure_qa(self, workspace: Workspace, *, enabled: bool) -> Workspace:
+        workspace.qa_enabled = enabled
+        return workspace
+
     async def reviewers(self, workspace_id: int) -> list[User]:
         """Who should be asked to review: reviewers, or admins if there are none."""
         members = await self.list_members(workspace_id)

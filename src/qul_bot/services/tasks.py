@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -9,17 +10,29 @@ from typing import Any
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qul_bot.db.models import Task, TaskComment, TaskEvent, User, Workspace, task_assignees
+from qul_bot.db.models import (
+    ChecklistItem,
+    Task,
+    TaskAttachment,
+    TaskComment,
+    TaskEvent,
+    User,
+    Workspace,
+    task_assignees,
+)
 from qul_bot.db.types import utcnow
 from qul_bot.domain.enums import (
     ACTIVE_STATUSES,
+    CLOSED_STATUSES,
     PRIORITY_ORDER,
     STATUS_ORDER,
     EventType,
     Priority,
     Role,
+    TaskKind,
     TaskStatus,
 )
+from qul_bot.domain.releases import normalize_release
 from qul_bot.domain.workflow import (
     AUTO_ASSIGN_TARGETS,
     Actor,
@@ -32,6 +45,8 @@ from qul_bot.errors import InputError, NotFoundError, PermissionDenied
 from qul_bot.services.workspaces import WorkspaceService
 
 MAX_COMMENT_LENGTH = 2000
+MAX_CHECKLIST_ITEMS = 30
+MAX_CHECK_TEXT = 200
 DIGEST_SECTION_LIMIT = 10
 
 
@@ -45,6 +60,8 @@ class NewTask:
     due: date | None = None
     source_chat_id: int | None = None
     source_message_id: int | None = None
+    kind: TaskKind = TaskKind.TASK
+    release: str | None = None
 
 
 @dataclass(slots=True)
@@ -58,6 +75,8 @@ class TaskPatch:
     clear_area: bool = False
     due: date | None = None
     clear_due: bool = False
+    release: str | None = None
+    clear_release: bool = False
 
     def is_empty(self) -> bool:
         return (
@@ -68,6 +87,8 @@ class TaskPatch:
             and not self.clear_area
             and self.due is None
             and not self.clear_due
+            and self.release is None
+            and not self.clear_release
         )
 
 
@@ -88,6 +109,7 @@ class TaskFilter:
     priority: Priority | None = None
     assignee_id: int | None = None
     include_closed: bool = False
+    kind: TaskKind | None = None
 
     def effective_statuses(self) -> tuple[TaskStatus, ...]:
         if self.statuses:
@@ -110,13 +132,19 @@ class Digest:
     overdue: list[Task]
     due_today: list[Task]
     in_review: list[Task]
+    in_testing: list[Task]
     blocked: list[Task]
     unassigned: list[Task]
 
     @property
     def is_empty(self) -> bool:
         return not (
-            self.overdue or self.due_today or self.in_review or self.blocked or self.unassigned
+            self.overdue
+            or self.due_today
+            or self.in_review
+            or self.in_testing
+            or self.blocked
+            or self.unassigned
         )
 
 
@@ -126,6 +154,35 @@ class HistoryEntry:
     actor_name: str
     #: Display name of the person an assign/unassign event is about, if any.
     subject_name: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ReleaseReport:
+    release: str
+    tasks: list[Task]
+    #: Unticked checklist items on tasks that are not finished yet.
+    open_checks: int
+
+    @property
+    def pending(self) -> list[Task]:
+        return [t for t in self.tasks if t.status not in CLOSED_STATUSES]
+
+    @property
+    def open_bugs(self) -> list[Task]:
+        return [t for t in self.pending if t.kind is TaskKind.BUG]
+
+    def count(self, status: TaskStatus) -> int:
+        return sum(1 for t in self.tasks if t.status is status)
+
+    @property
+    def ready(self) -> bool:
+        return not self.pending
+
+
+def _version_key(label: str) -> tuple[tuple[int, int | str], ...]:
+    """Sort `1.10.0` after `1.9.0`; non-numeric parts compare as text."""
+    parts = re.split(r"[.\-_]", label)
+    return tuple((0, int(p)) if p.isdigit() else (1, p) for p in parts)
 
 
 def _state(task: Task) -> TaskState:
@@ -194,6 +251,8 @@ class TaskService:
             stmt = stmt.where(Task.area_id == flt.area_id)
         if flt.priority is not None:
             stmt = stmt.where(Task.priority == flt.priority)
+        if flt.kind is not None:
+            stmt = stmt.where(Task.kind == flt.kind)
         if flt.assignee_id is not None:
             stmt = stmt.where(
                 Task.id.in_(
@@ -288,6 +347,7 @@ class TaskService:
             overdue=[t for t in active if t.due_date and t.due_date < today],
             due_today=[t for t in active if t.due_date == today],
             in_review=[t for t in active if t.status is TaskStatus.REVIEW],
+            in_testing=[t for t in active if t.status is TaskStatus.TESTING],
             blocked=[t for t in active if t.status is TaskStatus.BLOCKED],
             unassigned=[t for t in active if not t.assignees and t.status is not TaskStatus.REVIEW],
         )
@@ -333,6 +393,8 @@ class TaskService:
             source_chat_id=data.source_chat_id,
             source_message_id=data.source_message_id,
             status=TaskStatus.TODO,
+            kind=data.kind,
+            release=normalize_release(data.release) if data.release else None,
         )
         task.assignees = unique
         self.session.add(task)
@@ -347,6 +409,8 @@ class TaskService:
             area=task.area.slug if task.area else None,
             assignees=[u.id for u in unique],
             due=task.due_date.isoformat() if task.due_date else None,
+            kind=task.kind.value,
+            release=task.release,
         )
         return task
 
@@ -358,7 +422,7 @@ class TaskService:
         reason: str | None = None,
     ) -> StatusChange:
         task = await self.get_by_id(task_id, for_update=True)
-        check_transition(_state(task), target, actor)
+        check_transition(await self.state_of(task), target, actor)
 
         previous = task.status
         task.status = target
@@ -450,6 +514,12 @@ class TaskService:
                 ]
                 task.due_date = new_due
 
+        if patch.clear_release or patch.release is not None:
+            new_release = None if patch.clear_release else normalize_release(patch.release or "")
+            if new_release != task.release:
+                changes["release"] = [task.release, new_release]
+                task.release = new_release
+
         if changes:
             task.updated_at = utcnow()
             self._log(task, actor.user_id, EventType.EDITED, changes=changes)
@@ -488,7 +558,148 @@ class TaskService:
         await self.session.flush()
         return task
 
+    # ---- QA, checklists, attachments ---------------------------------------------------
+
+    async def qa_active(self, workspace_id: int) -> bool:
+        """The testing step applies when it is enabled and the team has at least one QA."""
+        workspace = await self.session.get(Workspace, workspace_id)
+        if workspace is None or not workspace.qa_enabled:
+            return False
+        return bool(await self.workspaces.testers(workspace_id))
+
+    async def state_of(self, task: Task) -> TaskState:
+        """Everything the workflow rules need to know about a task."""
+        done, total = await self.checklist_progress(task.id)
+        return TaskState(
+            status=task.status,
+            reporter_id=task.reporter_id,
+            assignee_ids=frozenset(u.id for u in task.assignees),
+            qa_active=await self.qa_active(task.workspace_id),
+            open_checks=total - done,
+        )
+
+    async def checklist(self, task_id: int) -> list[ChecklistItem]:
+        result = await self.session.execute(
+            select(ChecklistItem)
+            .where(ChecklistItem.task_id == task_id)
+            .order_by(ChecklistItem.position, ChecklistItem.id)
+        )
+        return list(result.scalars().all())
+
+    async def checklist_progress(self, task_id: int) -> tuple[int, int]:
+        """(ticked, total) checklist items."""
+        items = await self.checklist(task_id)
+        return sum(1 for i in items if i.done), len(items)
+
+    async def add_checks(
+        self, task_id: int, actor: Actor, texts: Sequence[str]
+    ) -> list[ChecklistItem]:
+        task = await self.get_by_id(task_id, for_update=True)
+        self._require_check_rights(task, actor)
+        cleaned = [t.strip()[:MAX_CHECK_TEXT] for t in texts if t.strip()]
+        if not cleaned:
+            raise InputError("check_usage")
+        items = await self.checklist(task.id)
+        if len(items) + len(cleaned) > MAX_CHECKLIST_ITEMS:
+            raise InputError("checklist_full", max=MAX_CHECKLIST_ITEMS)
+        start = max((i.position for i in items), default=0)
+        added = [
+            ChecklistItem(task_id=task.id, position=start + n, text=text)
+            for n, text in enumerate(cleaned, start=1)
+        ]
+        self.session.add_all(added)
+        self._log(task, actor.user_id, EventType.CHECKLIST, added=len(added))
+        await self.session.flush()
+        return added
+
+    async def remove_check(self, task_id: int, actor: Actor, number: int) -> ChecklistItem:
+        """Remove the `number`-th item (1-based, as shown to people)."""
+        task = await self.get_by_id(task_id, for_update=True)
+        self._require_check_rights(task, actor)
+        items = await self.checklist(task.id)
+        if not 1 <= number <= len(items):
+            raise NotFoundError("check_not_found", number=number)
+        item = items[number - 1]
+        await self.session.delete(item)
+        self._log(task, actor.user_id, EventType.CHECKLIST, removed=item.text)
+        await self.session.flush()
+        return item
+
+    async def toggle_check(self, item_id: int, actor: Actor) -> tuple[Task, ChecklistItem]:
+        item = await self.session.get(ChecklistItem, item_id)
+        if item is None:
+            raise NotFoundError("check_not_found", number=0)
+        task = await self.get_by_id(item.task_id, for_update=True)
+        self._require_check_rights(task, actor)
+        item.done = not item.done
+        item.done_by_id = actor.user_id if item.done else None
+        item.done_at = utcnow() if item.done else None
+        self._log(task, actor.user_id, EventType.CHECKLIST, toggled=item.text, done=item.done)
+        await self.session.flush()
+        return task, item
+
+    async def add_attachment(
+        self, task_id: int, uploader_id: int, kind: str, file_id: str, caption: str | None = None
+    ) -> TaskAttachment:
+        attachment = TaskAttachment(
+            task_id=task_id, kind=kind, file_id=file_id, caption=caption, uploader_id=uploader_id
+        )
+        self.session.add(attachment)
+        await self.session.flush()
+        return attachment
+
+    async def attachments(self, task_id: int) -> list[TaskAttachment]:
+        result = await self.session.execute(
+            select(TaskAttachment)
+            .where(TaskAttachment.task_id == task_id)
+            .order_by(TaskAttachment.id)
+        )
+        return list(result.scalars().all())
+
+    # ---- releases -----------------------------------------------------------------------
+
+    async def releases(self, workspace_id: int) -> list[tuple[str, int, int]]:
+        """(release, total tasks, finished tasks), newest release label first."""
+        finished = func.sum(case((Task.status.in_(CLOSED_STATUSES), 1), else_=0))
+        result = await self.session.execute(
+            select(Task.release, func.count(), finished)
+            .where(
+                Task.workspace_id == workspace_id,
+                Task.deleted_at.is_(None),
+                Task.release.is_not(None),
+            )
+            .group_by(Task.release)
+        )
+        rows = [(str(r), int(total), int(done or 0)) for r, total, done in result.all()]
+        return sorted(rows, key=lambda row: _version_key(row[0]), reverse=True)
+
+    async def release_report(self, workspace_id: int, raw_release: str) -> ReleaseReport:
+        release = normalize_release(raw_release)
+        result = await self.session.execute(
+            select(Task)
+            .where(
+                Task.workspace_id == workspace_id,
+                Task.deleted_at.is_(None),
+                Task.release == release,
+            )
+            .order_by(Task.number)
+        )
+        tasks = list(result.scalars().all())
+        if not tasks:
+            raise NotFoundError("release_not_found", release=release)
+        open_checks = 0
+        for task in tasks:
+            if task.status not in CLOSED_STATUSES:
+                done, total = await self.checklist_progress(task.id)
+                open_checks += total - done
+        return ReleaseReport(release=release, tasks=tasks, open_checks=open_checks)
+
     # ---- internals --------------------------------------------------------------------
+
+    def _require_check_rights(self, task: Task, actor: Actor) -> None:
+        """Checklists belong to the people doing the work and to testers."""
+        if not actor.can_test:
+            self._require_modify(task, actor)
 
     def _require_modify(self, task: Task, actor: Actor) -> None:
         if not can_modify(_state(task), actor):

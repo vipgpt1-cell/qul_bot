@@ -83,6 +83,7 @@ MESSAGES: dict[str, str] = {
     "status.todo": "Kutilmoqda",
     "status.doing": "Jarayonda",
     "status.review": "Tekshiruvda",
+    "status.testing": "Testda",
     "status.blocked": "Bloklangan",
     "status.done": "Bajarildi",
     "status.cancelled": "Bekor qilingan",
@@ -106,6 +107,10 @@ MESSAGES: dict[str, str] = {
     "card.reporter": "✍️ Muallif: {user}",
     "card.source": '🔗 <a href="{url}">Xabarga o\'tish</a>',
     "card.comments": "💬 <b>Izohlar</b>",
+    "card.release": "🏷 Reliz: {release}",
+    "card.checklist": "☑️ Tekshiruv ro'yxati: {done}/{total} — /check {number}",
+    "card.files": "📎 Ilovalar: {count} — /files {number}",
+    "kind.bug": "🐞 Bug",
     # ---- buttons ------------------------------------------------------------------------
     "btn.start": "▶️ Boshlash",
     "btn.resume": "▶️ Davom ettirish",
@@ -113,6 +118,9 @@ MESSAGES: dict[str, str] = {
     "btn.block": "⛔ Bloklash",
     "btn.approve": "✅ Tasdiqlash",
     "btn.reject": "↩️ Qaytarish",
+    "btn.test_pass": "✅ Testdan o'tdi",
+    "btn.test_fail": "🐞 Testdan o'tmadi",
+    "btn.checklist": "☑️ Tekshiruv ro'yxati",
     "btn.cancel": "🚫 Bekor qilish",
     "btn.reopen": "🔄 Qayta ochish",
     "btn.me": "🙋 Menga",
@@ -133,9 +141,12 @@ MESSAGES: dict[str, str] = {
     "changed.blocked": "⛔ <b>#{number}</b> bloklandi — {actor}\n{title}",
     "changed.done": "✅ <b>#{number}</b> bajarildi va tasdiqlandi — {actor}\n{title}",
     "changed.cancelled": "🚫 <b>#{number}</b> bekor qilindi — {actor}\n{title}",
+    "changed.testing": "🧪 <b>#{number}</b> testga o'tdi — {actor}\n{title}",
+    "changed.test_failed": "🐞 <b>#{number}</b> testdan o'tmadi — {actor}\n{title}",
     "changed.rejected": "↩️ <b>#{number}</b> qayta ishlash uchun qaytarildi — {actor}\n{title}",
     "changed.reason": "💬 Sabab: {reason}",
     "notify.reviewers": "🔍 Tekshiruvchilar: {users}",
+    "notify.testers": "🧪 Testerlar: {users}",
     "notify.assignees": "👤 Mas'ullar: {users}",
     "notify.assigned": "🔔 Mas'ul etib belgilandi: {users}",
     "notify.auto_assigned": "👤 {user} mas'ul etib belgilandi",
@@ -150,6 +161,7 @@ MESSAGES: dict[str, str] = {
     "list.total": "Jami: {count}",
     "list.empty": "Hozircha vazifa yo'q 🎉",
     "list.with_closed": "yopilganlar bilan",
+    "list.bugs": "🐞 Buglar",
     "digest.title": "🗓 <b>Xulosa</b> — {date}",
     "digest.all_clear": (
         "Hammasi joyida: muddati o'tgan, tekshiruv kutayotgan yoki egasiz vazifalar yo'q 🎉"
@@ -157,6 +169,7 @@ MESSAGES: dict[str, str] = {
     "digest.overdue": "⚠️ Muddati o'tgan",
     "digest.due_today": "📅 Bugun muddati",
     "digest.in_review": "👀 Tekshiruv kutmoqda",
+    "digest.in_testing": "🧪 Testda",
     "digest.blocked": "⛔ Bloklangan",
     "digest.unassigned": "🙋 Mas'ulsiz",
     "digest.more": "… yana {count} ta",
@@ -177,6 +190,7 @@ MESSAGES: dict[str, str] = {
     "history.unassigned": "👤 {actor} → {user} mas'uliyatdan olindi",
     "history.edited": "✏️ {actor} o'zgartirdi: {fields}",
     "history.commented": "💬 {actor} izoh qoldirdi",
+    "history.checklist": "☑️ {actor} tekshiruv ro'yxatini yangiladi",
     "history.deleted": "🗑 {actor} o'chirdi",
     "history.restored": "♻️ {actor} qayta tikladi",
     "history.field.title": "nom",
@@ -184,6 +198,7 @@ MESSAGES: dict[str, str] = {
     "history.field.priority": "ustuvorlik",
     "history.field.area": "yo'nalish",
     "history.field.due": "muddat",
+    "history.field.release": "reliz",
     # ---- assignee picker ----------------------------------------------------------------
     "picker.menu": "👥 <b>Kimga tayinlaymiz?</b> Guruhni tanlang:",
     "picker.group": "👥 <b>{specialty}</b> — ismni bosing (qayta bossangiz olib tashlanadi)",
@@ -199,6 +214,58 @@ MESSAGES: dict[str, str] = {
     "specialty.choose": "Mutaxassisligingizni tanlang:",
     "specialty.saved": "✅ Mutaxassislik: {specialty}",
     "specialty.changed": "✅ {users} — mutaxassislik: {specialty}",
+    # ---- bug reports ------------------------------------------------------------------
+    "bug.intro": "🐞 <b>Bug hisoboti</b> — savollarga <b>javob berib</b> yozing. "
+    "O'tkazib yuborish: <code>-</code>, bekor qilish: /cancel",
+    "bug.ask.title": "1/6. Qisqacha: nima ishlamayapti?",
+    "bug.ask.steps": "2/6. Qanday takrorlash mumkin? (qadamlar)",
+    "bug.ask.expected": "3/6. Nima bo'lishi kerak edi?",
+    "bug.ask.actual": "4/6. Aslida nima bo'ldi?",
+    "bug.ask.device": "5/6. Qurilma va versiya (masalan: iPhone 13, iOS 18; ilova 1.4.0)",
+    "bug.ask.severity": "Jiddiylik darajasi:",
+    "bug.ask.screenshot": "6/6. Skrinshot yoki video yuboring (javob qilib) — yoki <code>-</code>",
+    "bug.severity.critical": "🔴 Kritik",
+    "bug.severity.major": "🟠 Jiddiy",
+    "bug.severity.minor": "🟡 O'rtacha",
+    "bug.severity.trivial": "🟢 Kichik",
+    "bug.severity_chosen": "Jiddiylik: {severity}",
+    "bug.field.steps": "🔁 Qadamlar",
+    "bug.field.expected": "✅ Kutilgan natija",
+    "bug.field.actual": "❌ Haqiqiy natija",
+    "bug.field.device": "📱 Qurilma",
+    "bug.created": "🐞 <b>Bug qayd etildi</b>",
+    "bug.assign_hint": "👥 Mas'ulni tanlang: kartadagi <b>Tayinlash</b> tugmasi.",
+    "bug.cancelled": "Bug hisoboti bekor qilindi.",
+    "bug.not_your_form": "Bu boshqa odamning bug hisoboti.",
+    # ---- checklists -------------------------------------------------------------------
+    "check.title": "☑️ <b>#{number}</b> tekshiruv ro'yxati ({done}/{total})",
+    "check.empty": (
+        "Ro'yxat bo'sh. Qo'shish: <code>/check {number} Login ishlaydi; Dark mode</code>"
+    ),
+    "check.hint": "Bandni bosing — belgilanadi. Qo'shish: <code>/check {number} matn</code>, "
+    "o'chirish: <code>/check {number} -2</code>",
+    # ---- releases ---------------------------------------------------------------------
+    "release.none": "Hali reliz yo'q. Vazifaga reliz qo'shing: <code>/edit 12 v:1.4.0</code> "
+    "yoki <code>/task ... v:1.4.0</code>",
+    "release.list_title": "🏷 <b>Relizlar</b>",
+    "release.list_row": "{mark} <b>{release}</b> — {done}/{total} tayyor · /release {release}",
+    "release.list_hint": "Hisobot: <code>/release 1.4.0</code>",
+    "release.title": "🏷 <b>Reliz {release}</b> — {verdict}",
+    "release.ready": "✅ chiqarishga tayyor",
+    "release.not_ready": "⛔ hali tayyor emas",
+    "release.totals": "Jami: {total} · ✅ {done} bajarildi · 🚫 {cancelled} bekor",
+    "release.open_bugs": "🐞 Ochiq buglar: {count} ({breakdown})",
+    "release.open_checks": "☑️ Belgilanmagan tekshiruv bandlari: {count}",
+    "release.pending": "<b>Qolgan ishlar:</b>",
+    # ---- QA settings & files ----------------------------------------------------------
+    "qa.on": "🧪 QA bosqichi <b>yoqilgan</b>. Tekshiruvdan o'tgan vazifa testga o'tadi.\n"
+    "Testerlar: {users}",
+    "qa.no_testers": "🧪 QA bosqichi yoqilgan, lekin jamoada QA yo'q — vazifalar "
+    "to'g'ridan-to'g'ri bajarildi bo'ladi. Tester qo'shish: <code>/specialty @username qa</code>",
+    "qa.off": "🧪 QA bosqichi <b>o'chirilgan</b>: tasdiqlangan vazifa darhol bajarildi bo'ladi.",
+    "qa.hint": "Admin: <code>/qa on</code> yoki <code>/qa off</code>",
+    "files.none": "📎 <b>#{number}</b> da ilova yo'q.",
+    "files.caption": "📎 #{number} — {title}",
     # ---- areas & team -------------------------------------------------------------------
     "areas.title": "📂 <b>Yo'nalishlar</b>",
     "areas.empty": (
@@ -227,6 +294,11 @@ MESSAGES: dict[str, str] = {
     "menu.digest": "Kunlik xulosa",
     "menu.help": "Yordam",
     "menu.find": "Vazifa qidirish",
+    "menu.bug": "Bug haqida xabar berish",
+    "menu.bugs": "Ochiq buglar",
+    "menu.check": "Tekshiruv ro'yxati",
+    "menu.release": "Reliz hisoboti",
+    "menu.qa": "QA bosqichi sozlamasi",
     "menu.specialty": "Mutaxassislik tanlash",
     "menu.approve": "Vazifani tasdiqlash",
     "menu.reject": "Vazifani qaytarish",
@@ -302,6 +374,20 @@ MESSAGES: dict[str, str] = {
         "Misol: <code>/digest 09:00</code>, <code>/digest off</code>"
     ),
     "err.find_usage": "Qidirish uchun kamida 2 ta belgi yozing: <code>/find login</code>",
+    "err.bad_release": (
+        "🏷 Reliz nomini tushunmadim: <code>{value}</code>. Misol: <code>v:1.4.0</code>"
+    ),
+    "err.release_not_found": "🏷 <b>{release}</b> relizida vazifa yo'q. Ro'yxat: /release",
+    "err.check_usage": "Band matnini yozing: <code>/check 12 Login ishlaydi; Dark mode</code>",
+    "err.check_not_found": "☑️ Bunday band topilmadi.",
+    "err.checklist_full": "☑️ Ro'yxatda ko'pi bilan {max} ta band bo'lishi mumkin.",
+    "err.checklist_incomplete": (
+        "☑️ Tekshiruv ro'yxatida {count} ta belgilanmagan band bor. Avval ularni tugating: /check"
+    ),
+    "err.qa_inactive": "🧪 QA bosqichi faol emas (jamoada QA yo'q yoki /qa off).",
+    "err.qa_required": "🧪 Bu vazifa avval testdan o'tishi kerak (QA bosqichi yoqilgan).",
+    "err.tester_required": "🧪 Testdagi vazifani faqat QA yoki admin o'tkazadi yoki qaytaradi.",
+    "err.qa_usage": "Foydalanish: <code>/qa on</code> yoki <code>/qa off</code>",
     "err.same_status": "ℹ️ Vazifa allaqachon shu holatda: {status}.",
     "err.self_approval": (
         "🔒 O'zingiz bajargan vazifani o'zingiz tasdiqlay olmaysiz. "

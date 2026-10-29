@@ -10,6 +10,7 @@ from qul_bot.bot.commands import (
     EDIT_COMMANDS,
     LIST_COMMANDS,
     PUBLIC_COMMANDS,
+    QA_COMMANDS,
     STATUS_COMMANDS,
     TASK_COMMANDS,
 )
@@ -44,5 +45,6 @@ def test_groups_cover_everything() -> None:
         *STATUS_COMMANDS,
         "done",
         *ADMIN_COMMANDS,
+        *QA_COMMANDS,
     }
     assert grouped == set(ALL_COMMANDS)

@@ -34,7 +34,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from qul_bot.db.base import Base
 from qul_bot.db.types import UTCDateTime, json_default, str_enum, utcnow
-from qul_bot.domain.enums import EventType, Priority, Role, TaskStatus
+from qul_bot.domain.enums import EventType, Priority, Role, TaskKind, TaskStatus
 from qul_bot.domain.specialty import Specialty
 
 
@@ -52,6 +52,8 @@ class Workspace(Base):
     digest_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     digest_time: Mapped[str] = mapped_column(String(5), default="09:00", server_default="09:00")
     last_digest_on: Mapped[date | None] = mapped_column(Date)
+    #: Use the QA (testing) step when the team has at least one QA.
+    qa_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -115,6 +117,7 @@ class Task(Base):
     __table_args__ = (
         UniqueConstraint("workspace_id", "number"),
         Index("ix_tasks_workspace_id_status", "workspace_id", "status"),
+        Index("ix_tasks_workspace_id_release", "workspace_id", "release"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -125,6 +128,11 @@ class Task(Base):
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[TaskStatus] = mapped_column(str_enum(TaskStatus, 16), default=TaskStatus.TODO)
     priority: Mapped[Priority] = mapped_column(str_enum(Priority, 16), default=Priority.NORMAL)
+    kind: Mapped[TaskKind] = mapped_column(
+        str_enum(TaskKind, 8), default=TaskKind.TASK, server_default=TaskKind.TASK.value
+    )
+    #: The release (version) this task ships in, e.g. "1.4.0".
+    release: Mapped[str | None] = mapped_column(String(32))
     area_id: Mapped[int | None] = mapped_column(ForeignKey("areas.id", ondelete="SET NULL"))
     reporter_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     due_date: Mapped[date | None] = mapped_column(Date)
@@ -141,6 +149,35 @@ class Task(Base):
     assignees: Mapped[list[User]] = relationship(
         secondary=task_assignees, lazy="selectin", order_by=User.id
     )
+
+
+class ChecklistItem(Base):
+    """One line of a task's test checklist; all must be ticked before the task is done."""
+
+    __tablename__ = "checklist_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int]
+    text: Mapped[str] = mapped_column(String(200))
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    done_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    done_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class TaskAttachment(Base):
+    """A file kept on Telegram's servers and referenced by its file id (e.g. a bug screenshot)."""
+
+    __tablename__ = "task_attachments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # "photo" | "document"
+    file_id: Mapped[str] = mapped_column(String(255))
+    caption: Mapped[str | None] = mapped_column(Text)
+    uploader_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class TaskComment(Base):

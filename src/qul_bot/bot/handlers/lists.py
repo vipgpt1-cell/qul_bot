@@ -21,7 +21,7 @@ from qul_bot.bot.formatting import (
 from qul_bot.bot.handlers.helpers import require_admin
 from qul_bot.bot.keyboards import pagination_keyboard
 from qul_bot.db.models import User, Workspace
-from qul_bot.domain.enums import TaskStatus
+from qul_bot.domain.enums import TaskKind, TaskStatus
 from qul_bot.domain.schedule import parse_clock
 from qul_bot.errors import InputError, NotFoundError
 from qul_bot.i18n import Translator
@@ -39,6 +39,7 @@ async def build_filter(
     *,
     assignee: User | None = None,
     statuses: frozenset[TaskStatus] = frozenset(),
+    kind: TaskKind | None = None,
 ) -> TaskFilter:
     workspace = ctx.require_workspace()
     workspaces = WorkspaceService(session)
@@ -65,6 +66,7 @@ async def build_filter(
         priority=parsed.priority,
         assignee_id=assignee.id if assignee else None,
         include_closed=parsed.include_closed,
+        kind=kind or parsed.kind,
     )
 
 
@@ -80,6 +82,8 @@ async def list_title(session: AsyncSession, t: Translator, flt: TaskFilter) -> s
         for area, _ in await workspaces.list_areas(flt.workspace_id):
             if area.id == flt.area_id:
                 parts.append(f"#{esc(area.slug)}")
+    if flt.kind is TaskKind.BUG:
+        parts.append(t("list.bugs"))
     if flt.priority:
         parts.append(priority_label(t, flt.priority))
     parts += [status_label(t, status) for status in flt.statuses]

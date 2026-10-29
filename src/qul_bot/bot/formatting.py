@@ -10,16 +10,24 @@ import html
 from collections.abc import Iterable, Sequence
 from datetime import date, tzinfo
 
-from qul_bot.db.models import Membership, Task, TaskComment, User
-from qul_bot.domain.enums import ACTIVE_STATUSES, EventType, Priority, Role, TaskStatus
+from qul_bot.db.models import ChecklistItem, Membership, Task, TaskComment, User
+from qul_bot.domain.enums import (
+    ACTIVE_STATUSES,
+    EventType,
+    Priority,
+    Role,
+    TaskKind,
+    TaskStatus,
+)
 from qul_bot.domain.specialty import SPECIALTY_ORDER, Specialty
 from qul_bot.i18n import Translator
-from qul_bot.services.tasks import Digest, HistoryEntry, StatusChange, TaskPage
+from qul_bot.services.tasks import Digest, HistoryEntry, ReleaseReport, StatusChange, TaskPage
 
 STATUS_EMOJI: dict[TaskStatus, str] = {
     TaskStatus.TODO: "⚪",
     TaskStatus.DOING: "🔵",
     TaskStatus.REVIEW: "👀",
+    TaskStatus.TESTING: "🧪",
     TaskStatus.BLOCKED: "⛔",
     TaskStatus.DONE: "✅",
     TaskStatus.CANCELLED: "🚫",
@@ -146,11 +154,15 @@ def render_card(
     today: date,
     comments: Sequence[TaskComment] = (),
     header: str | None = None,
+    *,
+    checks: tuple[int, int] = (0, 0),
+    attachments: int = 0,
 ) -> str:
     lines: list[str] = []
     if header:
         lines += [header, ""]
-    lines.append(f"<b>#{task.number}</b> · {status_label(t, task.status)}")
+    kind = f"{t('kind.bug')} · " if task.kind is TaskKind.BUG else ""
+    lines.append(f"<b>#{task.number}</b> · {kind}{status_label(t, task.status)}")
     lines.append(f"<b>{esc(task.title)}</b>")
     if task.description:
         lines += ["", esc(truncate(task.description, DESCRIPTION_LIMIT))]
@@ -168,6 +180,13 @@ def render_card(
         due = task.due_date.strftime("%d.%m.%Y")
         suffix = t("card.overdue") if is_overdue(task, today) else ""
         lines.append(t("card.due", date=due, overdue=suffix))
+    if task.release:
+        lines.append(t("card.release", release=esc(task.release)))
+    done, total = checks
+    if total:
+        lines.append(t("card.checklist", done=done, total=total, number=task.number))
+    if attachments:
+        lines.append(t("card.files", count=attachments, number=task.number))
     assignees = names(task.assignees) if task.assignees else t("card.unassigned")
     lines.append(t("card.assignees", users=assignees))
     lines.append(t("card.reporter", user=user_name(task.reporter)))
@@ -185,7 +204,8 @@ def render_card(
 def render_task_line(t: Translator, task: Task, today: date) -> str:
     """One compact list row. `/t42` is tappable in Telegram and opens the task."""
     title = esc(truncate(task.title, LINE_TITLE_LIMIT))
-    head = f"/t{task.number} {PRIORITY_EMOJI[task.priority]} {title}"
+    bug = "🐞 " if task.kind is TaskKind.BUG else ""
+    head = f"/t{task.number} {PRIORITY_EMOJI[task.priority]} {bug}{title}"
     meta: list[str] = []
     if task.assignees:
         meta.append(short_names(task.assignees))
@@ -241,6 +261,7 @@ def render_digest(t: Translator, digest: Digest, today: date, limit: int) -> str
         ("digest.overdue", digest.overdue),
         ("digest.due_today", digest.due_today),
         ("digest.in_review", digest.in_review),
+        ("digest.in_testing", digest.in_testing),
         ("digest.blocked", digest.blocked),
         ("digest.unassigned", digest.unassigned),
     )
@@ -265,12 +286,15 @@ def render_status_change(
     *,
     reason: str | None = None,
     reviewers: Sequence[User] = (),
+    testers: Sequence[User] = (),
 ) -> str:
     """The chat notice after a status change, pinging whoever needs to act next."""
     task = change.task
     key = f"changed.{task.status.value}"
-    if change.previous is TaskStatus.REVIEW and task.status is TaskStatus.DOING:
+    if task.status is TaskStatus.DOING and change.previous is TaskStatus.REVIEW:
         key = "changed.rejected"
+    elif task.status is TaskStatus.DOING and change.previous is TaskStatus.TESTING:
+        key = "changed.test_failed"
     lines = [
         t(key, number=task.number, title=esc(truncate(task.title, 100)), actor=user_name(actor))
     ]
@@ -283,7 +307,11 @@ def render_status_change(
         pending = [u for u in reviewers if u.id != actor.id]
         if pending:
             lines.append(t("notify.reviewers", users=mentions(pending)))
-    elif key == "changed.rejected" or task.status is TaskStatus.DONE:
+    elif task.status is TaskStatus.TESTING:
+        pending = [u for u in testers if u.id != actor.id]
+        if pending:
+            lines.append(t("notify.testers", users=mentions(pending)))
+    elif key in ("changed.rejected", "changed.test_failed") or task.status is TaskStatus.DONE:
         others = [u for u in task.assignees if u.id != actor.id]
         if others:
             lines.append(t("notify.assignees", users=mentions(others)))
@@ -321,6 +349,8 @@ def _describe_event(t: Translator, entry: HistoryEntry) -> str:
             return t("history.edited", actor=actor, fields=fields)
         case EventType.COMMENTED:
             return t("history.commented", actor=actor)
+        case EventType.CHECKLIST:
+            return t("history.checklist", actor=actor)
         case EventType.DELETED:
             return t("history.deleted", actor=actor)
         case EventType.RESTORED:
@@ -333,4 +363,70 @@ def render_history(t: Translator, task: Task, entries: Sequence[HistoryEntry], t
     for entry in entries:
         when = entry.event.created_at.astimezone(tz).strftime("%d.%m %H:%M")
         lines.append(f"<code>{when}</code> {_describe_event(t, entry)}")
+    return "\n".join(lines)
+
+
+# ---- checklists & releases ------------------------------------------------------------
+
+
+def render_checklist(t: Translator, task: Task, items: Sequence[ChecklistItem]) -> str:
+    done = sum(1 for i in items if i.done)
+    lines = [
+        t("check.title", number=task.number, done=done, total=len(items)),
+        esc(truncate(task.title, 100)),
+        "",
+    ]
+    if not items:
+        lines.append(t("check.empty", number=task.number))
+        return "\n".join(lines)
+    lines += [
+        f"{n}. {'✅' if item.done else '⬜'} {esc(item.text)}" for n, item in enumerate(items, 1)
+    ]
+    lines += ["", t("check.hint", number=task.number)]
+    return "\n".join(lines)
+
+
+def render_release_list(t: Translator, releases: Sequence[tuple[str, int, int]]) -> str:
+    if not releases:
+        return t("release.none")
+    lines = [t("release.list_title"), ""]
+    for release, total, finished in releases[:30]:
+        mark = "✅" if finished == total else "⏳"
+        lines.append(
+            t("release.list_row", mark=mark, release=esc(release), done=finished, total=total)
+        )
+    lines += ["", t("release.list_hint")]
+    return "\n".join(lines)
+
+
+def render_release_report(t: Translator, report: ReleaseReport, today: date) -> str:
+    verdict = t("release.ready") if report.ready else t("release.not_ready")
+    lines = [t("release.title", release=esc(report.release), verdict=verdict), ""]
+    lines.append(
+        t(
+            "release.totals",
+            total=len(report.tasks),
+            done=report.count(TaskStatus.DONE),
+            cancelled=report.count(TaskStatus.CANCELLED),
+        )
+    )
+    active = [f"{STATUS_EMOJI[s]} {report.count(s)}" for s in ACTIVE_STATUSES if report.count(s)]
+    if active:
+        lines.append(" · ".join(active))
+    bugs = report.open_bugs
+    if bugs:
+        by_priority = " · ".join(
+            f"{PRIORITY_EMOJI[p]} {n}"
+            for p in Priority
+            if (n := sum(1 for b in bugs if b.priority is p))
+        )
+        lines.append(t("release.open_bugs", count=len(bugs), breakdown=by_priority))
+    if report.open_checks:
+        lines.append(t("release.open_checks", count=report.open_checks))
+    pending = report.pending
+    if pending:
+        lines += ["", t("release.pending")]
+        lines += [render_task_line(t, task, today) for task in pending[:15]]
+        if len(pending) > 15:
+            lines.append(t("digest.more", count=len(pending) - 15))
     return "\n".join(lines)

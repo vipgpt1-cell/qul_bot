@@ -10,6 +10,9 @@ class TaskStatus(StrEnum):
     BLOCKED = "blocked"
     DONE = "done"
     CANCELLED = "cancelled"
+    #: Code is approved; a tester (QA) is checking it. Declared last so the bit positions
+    #: used in inline-button callback data stay stable for the older statuses.
+    TESTING = "testing"
 
 
 #: Statuses that still need attention.
@@ -17,6 +20,7 @@ ACTIVE_STATUSES: tuple[TaskStatus, ...] = (
     TaskStatus.TODO,
     TaskStatus.DOING,
     TaskStatus.REVIEW,
+    TaskStatus.TESTING,
     TaskStatus.BLOCKED,
 )
 CLOSED_STATUSES: tuple[TaskStatus, ...] = (TaskStatus.DONE, TaskStatus.CANCELLED)
@@ -25,11 +29,17 @@ CLOSED_STATUSES: tuple[TaskStatus, ...] = (TaskStatus.DONE, TaskStatus.CANCELLED
 STATUS_ORDER: tuple[TaskStatus, ...] = (
     TaskStatus.DOING,
     TaskStatus.REVIEW,
+    TaskStatus.TESTING,
     TaskStatus.BLOCKED,
     TaskStatus.TODO,
     TaskStatus.DONE,
     TaskStatus.CANCELLED,
 )
+
+
+class TaskKind(StrEnum):
+    TASK = "task"
+    BUG = "bug"
 
 
 class Priority(StrEnum):
@@ -65,3 +75,4 @@ class EventType(StrEnum):
     COMMENTED = "task.commented"
     DELETED = "task.deleted"
     RESTORED = "task.restored"
+    CHECKLIST = "task.checklist_updated"

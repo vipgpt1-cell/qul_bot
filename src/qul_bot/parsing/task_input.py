@@ -8,6 +8,7 @@ Tokens (all optional, any position):
     @username        assignee (repeatable)
     !priority        urgent | high | normal | low   (also Uzbek: shoshilinch, yuqori, o'rta, past)
     muddat:<when>    deadline; `due:` and `deadline:` work too (`muddat:-` clears it)
+    v:<release>      the release it ships in, e.g. `v:1.4.0` (`release:`, `reliz:`; `v:-` clears)
 
 Everything else is the title. Extra lines become the description.
 """
@@ -18,7 +19,8 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-from qul_bot.domain.enums import Priority, TaskStatus
+from qul_bot.domain.enums import Priority, TaskKind, TaskStatus
+from qul_bot.domain.releases import normalize_release
 from qul_bot.errors import InputError
 from qul_bot.parsing.due import is_clear, parse_due
 
@@ -27,6 +29,7 @@ MAX_TITLE_LENGTH = 200
 _AREA_RE = re.compile(r"^#([A-Za-z][A-Za-z0-9_]{0,31})$")
 _USERNAME_RE = re.compile(r"^@([A-Za-z][A-Za-z0-9_]{4,31})$")
 _DUE_RE = re.compile(r"^(?:due|muddat|deadline):(.*)$", re.IGNORECASE)
+_RELEASE_RE = re.compile(r"^(?:v|release|reliz):(.+)$", re.IGNORECASE)
 _APOSTROPHES = str.maketrans({"‘": "'", "’": "'", "ʻ": "'", "ʼ": "'", "`": "'"})
 
 PRIORITY_WORDS: dict[str, Priority] = {
@@ -54,6 +57,9 @@ STATUS_WORDS: dict[str, TaskStatus] = {
     "jarayonda": TaskStatus.DOING,
     "review": TaskStatus.REVIEW,
     "tekshiruvda": TaskStatus.REVIEW,
+    "testing": TaskStatus.TESTING,
+    "test": TaskStatus.TESTING,
+    "testda": TaskStatus.TESTING,
     "blocked": TaskStatus.BLOCKED,
     "bloklangan": TaskStatus.BLOCKED,
     "done": TaskStatus.DONE,
@@ -64,6 +70,7 @@ STATUS_WORDS: dict[str, TaskStatus] = {
 }
 
 ALL_WORDS = frozenset({"all", "hammasi"})
+BUG_WORDS = frozenset({"bug", "bugs", "xato", "xatolar"})
 
 
 def normalize_apostrophes(text: str) -> str:
@@ -89,6 +96,8 @@ class TaskInput:
     assignees: list[str] = field(default_factory=list)
     due: date | None = None
     clear_due: bool = False
+    release: str | None = None
+    clear_release: bool = False
 
 
 def parse_task_input(text: str, today: date) -> TaskInput:
@@ -113,6 +122,12 @@ def parse_task_input(text: str, today: date) -> TaskInput:
                     result.assignees.append(username)
             elif token.startswith("!") and (priority := _priority_for(token[1:])):
                 result.priority = priority
+            elif match := _RELEASE_RE.match(word):
+                value = match.group(1)
+                if is_clear(value):
+                    result.release, result.clear_release = None, True
+                else:
+                    result.release, result.clear_release = normalize_release(value), False
             elif match := _DUE_RE.match(word):
                 value = match.group(1)
                 if is_clear(value):
@@ -142,6 +157,7 @@ class ListInput:
     priority: Priority | None = None
     assignees: list[str] = field(default_factory=list)
     include_closed: bool = False
+    kind: TaskKind | None = None
 
 
 def parse_list_input(text: str) -> ListInput:
@@ -157,6 +173,8 @@ def parse_list_input(text: str) -> ListInput:
             result.priority = priority
         elif lowered in ALL_WORDS:
             result.include_closed = True
+        elif lowered in BUG_WORDS:
+            result.kind = TaskKind.BUG
         elif lowered in STATUS_WORDS:
             result.statuses.add(STATUS_WORDS[lowered])
         elif match := _AREA_RE.match(token):
