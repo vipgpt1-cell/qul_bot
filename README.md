@@ -144,6 +144,8 @@ when it is approved or sent back.
 | `/digest` | overdue, due today, in review, blocked, unassigned |
 | `/find text` | search titles and descriptions, including finished tasks |
 | `/history 12` | what happened to a task, and who did it |
+| `/bugs` | open bugs |
+| `/release 1.4.0` | is the release ready? |
 | `/info 12` or `/t12` | one task with comments (`/t12` is tappable in lists) |
 
 ### Editing
@@ -153,6 +155,55 @@ or just `/assign 12` for yourself) · `/unassign 12 @user` · `/comment 12 text`
 `/delete 12` (asks first; admin or author) · `/restore 12` (admin).
 
 Use `#-` or `muddat:-` in `/edit` to clear the area or the deadline.
+
+### QA: testing step, checklists, bug reports, releases
+
+* **Testing step.** When the team has at least one person with the `qa` specialty, an approved
+  review goes to **🧪 Testing**, and only a QA (or an admin) passes it (`/approve`, `/done`) or
+  sends it back (`/reject 12 reason`). Testers are pinged; a failed test pings the developer.
+  Teams without a QA work exactly as before. Admins: `/qa off` / `/qa on`.
+* **Checklists.** `/check 12 Login works; Dark mode` adds items, `/check 12` shows them with tick
+  buttons (also the ☑️ button on every card), `/check 12 -2` removes item 2. A task with unticked
+  items cannot be done.
+* **Bug reports.** `/bug` starts a guided form (title, steps, expected, actual, device, severity,
+  screenshot); each question is a reply prompt, so it works with privacy mode. A multi-line
+  `/bug Title …` creates the bug at once; `/cancel` leaves the form. `/bugs` lists open bugs,
+  `/files 12` re-sends a task's screenshots.
+* **Releases.** Tag work with `v:1.4.0` (on `/task`, `/edit`, `/bug`). `/release` lists releases;
+  `/release 1.4.0` says **ready / not ready**, with open bugs by severity, unticked checks and the
+  remaining tasks.
+
+### App builds (.apk / .ipa)
+
+Send a build with the caption `/apk` (or reply `/apk` to a message that has one; in a private
+chat with the bot, just send the file). The bot answers with name, package / bundle id, version
+and build number, minimum and target OS, size, CPU architectures, signing schemes and certificate,
+permissions (sensitive ones listed) and, for iOS, the distribution type, team and profile expiry.
+
+It flags release mistakes: **debuggable** builds, **debug-key** signing, unsigned builds,
+v1-only signing on Android 11+ targets, a target SDK below Google Play's minimum, cleartext HTTP,
+expired certificates, and iOS development or expiring provisioning profiles. If the version
+matches a release, the report links `/release <version>`.
+
+Telegram lets bots download files up to **20 MB**. For larger builds, run a
+[local Bot API server](https://github.com/tdlib/telegram-bot-api) and set `TELEGRAM_API_URL`
+and `MAX_APP_SIZE_MB`. `.aab` bundles are not readable; send the `.apk` built from them.
+
+### AI helper (optional)
+
+Set `ANTHROPIC_API_KEY` to enable `/ai` (uses Claude, model `AI_MODEL`, default
+`claude-opus-5-5`):
+
+| Command | Does |
+|---|---|
+| reply `/ai tasks` to a message (or `/ai tasks <text>`) | summary + proposed tasks; **✅ Create all** makes them (only the requester can confirm) |
+| `/ai standup` | today's standup from the board: done, in progress, review/testing, blocked, risks |
+| `/ai <question>` | answers from the board, e.g. `/ai what is Ali working on?` |
+
+Nothing is created without a person confirming. Requests are limited per user (a short
+cooldown) and per workspace (`AI_DAILY_LIMIT` per day). When `/ai` is used, the workspace's task
+board (titles, statuses, assignees' names) is sent to Anthropic's API — enable it only if that is
+acceptable for your team. Errors (rate limits, overload, refusals) are reported in plain Uzbek.
 
 ### Automatic daily digest
 

@@ -21,4 +21,8 @@ in CI; locally use `make test-pg`.
   (at most once), like `DigestService`.
 * **Timestamps** are timezone-aware UTC (`UTCDateTime`). "Today" is computed in the workspace
   timezone (`RequestContext.today`).
+* `apps/` handles untrusted files: read entries with `apps.archive.read_entry` (size-capped),
+  raise `NotAnApp` for anything unreadable; `tests/test_apps.py` fuzzes this.
+* The AI model is reached only through `services.ai.AIClient`; tests use `tests/fake_ai.py`.
+  Never call the real API in tests.
 * Never key anything on `@username`; use user ids.

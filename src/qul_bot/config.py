@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -61,6 +61,13 @@ class Settings(DatabaseSettings):
     telegram_api_url: str | None = None
     #: Largest app build (.apk/.ipa) the bot will download and inspect.
     max_app_size_mb: int = 20
+    #: The AI helper (/ai) is off unless an Anthropic API key is set.
+    anthropic_api_key: SecretStr | None = None
+    ai_model: str = "claude-opus-5-5"
+    #: low | medium | high | xhigh | max: depth of thinking, and so cost and latency.
+    ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+    #: AI requests per workspace per day (a cost guard).
+    ai_daily_limit: int = 200
 
     @field_validator("allowed_chat_ids", "admin_user_ids", mode="before")
     @classmethod

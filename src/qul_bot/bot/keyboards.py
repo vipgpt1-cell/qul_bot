@@ -150,7 +150,7 @@ def specialty_keyboard(t: Translator) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[*_pairs(buttons), [clear]])
 
 
-HELP_PAGES = ("create", "workflow", "view", "team")
+HELP_PAGES = ("create", "workflow", "view", "team", "qa", "ai")
 
 
 def help_keyboard(t: Translator) -> InlineKeyboardMarkup:

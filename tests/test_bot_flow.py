@@ -807,7 +807,9 @@ async def test_help_is_a_menu_with_sections(bot_env: Harness) -> None:
     main = h.session.sent()[-1]
     assert "Qul Bot" in main.text
     buttons = h.session.buttons(main)
-    assert sorted(buttons) == ["hp:create", "hp:team", "hp:view", "hp:workflow"]
+    assert sorted(buttons) == [
+        "hp:ai", "hp:create", "hp:qa", "hp:team", "hp:view", "hp:workflow",
+    ]  # fmt: skip
 
     await h.press(ALI, "hp:workflow")
     assert "Tekshiruvda" in h.session.last_edit()

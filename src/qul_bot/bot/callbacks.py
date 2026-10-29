@@ -111,3 +111,10 @@ class BugSeverity(CallbackData, prefix="bs"):
     """Severity chosen in the /bug form."""
 
     level: str  # critical | major | minor | trivial
+
+
+class AIProposalAction(CallbackData, prefix="ai"):
+    """Confirm or dismiss tasks the AI proposed."""
+
+    key: str
+    action: str  # "all" | "no"

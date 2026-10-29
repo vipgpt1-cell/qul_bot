@@ -26,6 +26,7 @@ Telegram ──► bot/            thin: parse the update, call a service, rende
 | `parsing/` | Turning `#area @user !prio muddat:…` text into structured input. | touch the database |
 | `services/` | `TaskService`, `WorkspaceService`, `UserService`. Transactions, events, queries. | know about Telegram or contain Uzbek text |
 | `bot/` | Handlers, middlewares, keyboards, HTML rendering. | contain business rules |
+| `apps/` | Reading `.apk` / `.ipa` builds: binary XML, `resources.arsc`, APK signing blocks, plists. Pure, size-capped, fuzz-tested. | know about Telegram or the database |
 | `i18n/` | Message catalogs. Services raise `AppError(code)`; the bot translates `err.<code>`. | — |
 | `db/` | Schema and session factory. | — |
 
@@ -42,6 +43,30 @@ exactly like the bot does. If you find yourself writing a business rule in `bot/
    admins), and builds a `RequestContext`.
 3. The handler calls a service. Failures are `AppError`s with a stable code; one error handler
    translates them for the user.
+
+### QA workflow
+
+`todo → doing → review → testing → done`. The testing step is active only when enabled
+(`workspaces.qa_enabled`) **and** the team has a member with the `qa` specialty, so teams without
+testers are unaffected. The rule lives in `domain/workflow.py` (`TaskState.qa_active`,
+`open_checks`; `Actor.is_qa`); commands and buttons both resolve "approve" / "done" through
+`bot/status.py`, so they cannot disagree. Checklist items (`checklist_items`) gate `done`.
+
+### App builds
+
+`apps/` reads builds without external tools: Android's binary XML and resource table, the APK
+Signing Block (v2/v3/v3.1) and JAR (v1) signatures; certificates via `cryptography`. Uploaded
+files are hostile by default: entries are read only up to fixed sizes (no zip-bomb inflation),
+unknown compression is handled the way Android does, and parsing runs in a worker thread with a
+timeout. Verified against androguard on Google's `apksig` test corpus.
+
+### AI helper
+
+`services/ai.py` builds the context (team, open tasks, recent changes) and calls the model through
+the small `AIClient` protocol; `ClaudeClient` is the Anthropic implementation (structured JSON
+output for task extraction, server-side refusal fallbacks, typed error mapping to user messages).
+Tests use a scripted client, so the suite never calls the network. Proposed tasks are only created
+after the requester confirms.
 
 ### Background job: the daily digest
 
@@ -136,7 +161,8 @@ is missing. `workspaces.locale` selects the language per workspace.
 | Phase | Scope |
 |---|---|
 | **Done (this version)** | Capture (one-liner + reply), areas, priorities, deadlines, assignees, specialties and assignee picker, review workflow, buttons, reply-to-card shortcuts, lists/filters/pagination, search, history, scheduled daily digest, comments, soft delete, roles, event log, migrations, Docker, CI |
-| **Next** | Private deadline reminders to assignees (needs an opt-in `/start` in DM), mapping forum topics to areas, CSV export, weekly summary |
+| **Also done** | QA step, checklists, bug reports, releases, app build reports, AI helper |
+| **Next** | Private deadline reminders to assignees (needs an opt-in `/start` in DM), mapping forum topics to areas, CSV export, weekly summary, build history per app |
 | **Then** | Outbox + webhooks, GitHub integration, REST API, read-only web dashboard |
 | **Later** | Own task platform, more locales, optional AI helpers (e.g. "turn this thread into tasks") |
 

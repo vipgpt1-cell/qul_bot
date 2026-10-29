@@ -8,9 +8,10 @@ from aiogram.enums import ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from qul_bot.bot import errors
-from qul_bot.bot.handlers import admin, apps, callbacks, lists, public, qa, tasks
+from qul_bot.bot.handlers import admin, ai, apps, callbacks, lists, public, qa, tasks
 from qul_bot.bot.middlewares import ContextMiddleware, DbSessionMiddleware
 from qul_bot.config import Settings
+from qul_bot.services.ai import AIClient, ClaudeClient, UsageGuard
 
 
 def create_bot(settings: Settings) -> Bot:
@@ -26,11 +27,25 @@ def create_bot(settings: Settings) -> Bot:
     )
 
 
+def create_ai_client(settings: Settings) -> AIClient | None:
+    if settings.anthropic_api_key is None:
+        return None
+    return ClaudeClient(
+        settings.anthropic_api_key.get_secret_value(), settings.ai_model, settings.ai_effort
+    )
+
+
 def create_dispatcher(
-    settings: Settings, sessionmaker: async_sessionmaker[AsyncSession]
+    settings: Settings,
+    sessionmaker: async_sessionmaker[AsyncSession],
+    ai_client: AIClient | None = None,
 ) -> Dispatcher:
     dp = Dispatcher()
-    dp["settings"] = settings  # handlers can ask for `settings: Settings`
+    # Shared objects handlers can ask for by name (`settings: Settings`, `ai_client`, ...).
+    dp["settings"] = settings
+    dp["ai_client"] = ai_client if ai_client is not None else create_ai_client(settings)
+    dp["ai_guard"] = UsageGuard(daily_limit=settings.ai_daily_limit)
+    dp["ai_proposals"] = ai.ProposalStore()
     dp.update.outer_middleware(DbSessionMiddleware(sessionmaker))
 
     # Everything below `protected` runs behind the context middleware: the chat must be an
@@ -40,7 +55,7 @@ def create_dispatcher(
     protected.message.middleware(context)
     protected.callback_query.middleware(context)
     # `qa` first: its bug-form handlers must see answers and `/cancel` before anything else.
-    for module in (qa, apps, tasks, lists, admin, callbacks):
+    for module in (qa, apps, ai, tasks, lists, admin, callbacks):
         router = Router(name=module.__name__.rsplit(".", 1)[-1])
         module.register(router)
         protected.include_router(router)

@@ -35,6 +35,7 @@ EDIT_COMMANDS = (
 )  # fmt: skip
 ADMIN_COMMANDS = ("areas", "addarea", "delarea", "team", "role", "specialty")
 PUBLIC_COMMANDS = ("start", "help", "chatid")
+AI_COMMANDS = ("ai",)
 QA_COMMANDS = ("bug", "bugs", "check", "release", "qa", "files", "apk", "app", "build")
 
 ALL_COMMANDS: tuple[str, ...] = (
@@ -46,12 +47,13 @@ ALL_COMMANDS: tuple[str, ...] = (
     DONE_COMMAND,
     *ADMIN_COMMANDS,
     *QA_COMMANDS,
+    *AI_COMMANDS,
 )
 
 # What appears in Telegram's "/" menu. Aliases and rarely used commands stay out of it.
 _MENU_EVERYONE = (
     "task", "bug", "list", "my", "review", "bugs", "find", "info", "doing", "done",
-    "check", "release", "apk", "digest", "specialty", "help",
+    "check", "release", "apk", "ai", "digest", "specialty", "help",
 )  # fmt: skip
 _MENU_ADMINS = (
     "approve", "reject", "assign", "edit", "areas", "addarea", "team", "role", "qa",

@@ -18,7 +18,7 @@ NAMESPACES = {
     "help", "chatid", "status", "priority", "role", "created", "edited", "restored", "card",
     "btn", "toast", "changed", "notify", "assigned", "unassigned", "comment", "delete", "list",
     "digest", "areas", "area", "team", "menu", "err", "picker", "specialty", "find", "history",
-    "bug", "check", "release", "qa", "files", "kind", "app",
+    "bug", "check", "release", "qa", "files", "kind", "app", "ai",
 }  # fmt: skip
 TELEGRAM_TAGS = {"b", "i", "u", "s", "code", "pre", "a"}
 

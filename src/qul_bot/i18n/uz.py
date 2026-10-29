@@ -17,6 +17,28 @@ MESSAGES: dict[str, str] = {
     "help.btn.workflow": "🔄 Jarayon",
     "help.btn.view": "🔍 Ko'rish va qidirish",
     "help.btn.team": "👥 Jamoa va sozlamalar",
+    "help.btn.qa": "🧪 QA, buglar, buildlar",
+    "help.btn.ai": "🤖 AI yordamchi",
+    "help.page.qa": (
+        "🧪 <b>QA, buglar, buildlar</b>\n"
+        "\n"
+        "/bug — bug hisoboti (bot savol beradi, javob berib yozasiz)\n"
+        "/bugs — ochiq buglar\n"
+        "/check 12 band1; band2 — tekshiruv ro'yxati\n"
+        "/release 1.4.0 — reliz tayyormi? (vazifaga <code>v:1.4.0</code> qo'shing)\n"
+        "/apk — .apk/.ipa faylni izoh qilib yuboring: versiya, imzo, ruxsatlar, xatolar\n"
+        "\n"
+        "Jamoada QA bo'lsa, tasdiqlangan vazifa 🧪 testga o'tadi; QA uni o'tkazadi yoki qaytaradi."
+    ),
+    "help.page.ai": (
+        "🤖 <b>AI yordamchi</b>\n"
+        "\n"
+        "Muhokama xabariga javob berib <code>/ai tasks</code> — vazifalar taklifi\n"
+        "<code>/ai standup</code> — bugungi standup\n"
+        "<code>/ai Ali nima ustida ishlayapti?</code> — doskadan javob\n"
+        "\n"
+        "Vazifalar faqat siz tasdiqlaganingizdan keyin yaratiladi."
+    ),
     "help.page.create": (
         "🆕 <b>Vazifa qo'shish</b>\n"
         "\n"
@@ -124,6 +146,8 @@ MESSAGES: dict[str, str] = {
     "btn.cancel": "🚫 Bekor qilish",
     "btn.reopen": "🔄 Qayta ochish",
     "btn.me": "🙋 Menga",
+    "btn.ai_create_all": "✅ Hammasini yaratish",
+    "btn.ai_dismiss": "❌ Kerak emas",
     "btn.assign": "👥 Tayinlash",
     "btn.picker_done": "✔️ Tayyor",
     "btn.back": "⬅️ Orqaga",
@@ -294,6 +318,15 @@ MESSAGES: dict[str, str] = {
     "app.warn.ios_development": "Development profil — faqat dasturchilar qurilmasida ishlaydi",
     "app.warn.profile_expired": "Provisioning profil muddati <b>o'tgan</b> — ilova ochilmaydi",
     "app.warn.profile_expires_soon": "Provisioning profil muddati 2 haftadan kam qoldi",
+    # ---- AI helper --------------------------------------------------------------------
+    "ai.thinking": "🤖 O'ylayapman…",
+    "ai.summary_title": "🤖 <b>Suhbat xulosasi</b>",
+    "ai.proposed_title": "<b>Taklif qilingan vazifalar ({count}):</b>",
+    "ai.no_tasks": "Aniq vazifa topilmadi.",
+    "ai.created": "✅ {count} ta vazifa yaratildi: {links}",
+    "ai.dismissed": "🤖 Takliflar bekor qilindi.",
+    "ai.answer_title": "🤖 <b>Javob</b>",
+    "ai.standup_title": "🤖 <b>Standup</b>",
     # ---- areas & team -------------------------------------------------------------------
     "areas.title": "📂 <b>Yo'nalishlar</b>",
     "areas.empty": (
@@ -328,6 +361,7 @@ MESSAGES: dict[str, str] = {
     "menu.release": "Reliz hisoboti",
     "menu.qa": "QA bosqichi sozlamasi",
     "menu.apk": "Build (APK/IPA) tekshiruvi",
+    "menu.ai": "AI yordamchi",
     "menu.specialty": "Mutaxassislik tanlash",
     "menu.approve": "Vazifani tasdiqlash",
     "menu.reject": "Vazifani qaytarish",
@@ -429,6 +463,25 @@ MESSAGES: dict[str, str] = {
     ),
     "err.app_unreadable": "📦 Faylni o'qib bo'lmadi: bu yaroqli .apk/.ipa emas yoki buzilgan.",
     "err.app_timeout": "📦 Faylni tekshirish juda uzoq davom etdi. Keyinroq urinib ko'ring.",
+    "err.ai_disabled": (
+        "🤖 AI yordamchi o'chirilgan. Admin uni yoqishi uchun <code>ANTHROPIC_API_KEY</code> "
+        "sozlamasini qo'shishi kerak (README)."
+    ),
+    "err.ai_usage": (
+        "🤖 Foydalanish:\n"
+        "• xabarga javob berib <code>/ai tasks</code> — muhokamadan vazifalar\n"
+        "• <code>/ai standup</code> — bugungi standup\n"
+        "• <code>/ai Ali nima ustida ishlayapti?</code> — savol"
+    ),
+    "err.ai_busy": "🤖 AI hozir band yoki javob bermayapti. Birozdan keyin qayta urinib ko'ring.",
+    "err.ai_failed": "🤖 AI javobini tushunib bo'lmadi. Qayta urinib ko'ring.",
+    "err.ai_refused": "🤖 AI bu so'rovga javob bermadi. Boshqacha so'rab ko'ring.",
+    "err.ai_misconfigured": "🤖 AI kaliti noto'g'ri yoki ruxsati yo'q. Adminga xabar bering.",
+    "err.ai_slow_down": "🤖 Biroz kuting — keyingi so'rov bir necha soniyadan keyin.",
+    "err.ai_daily_limit": "🤖 Bugungi AI so'rovlar chegarasi ({limit}) tugadi.",
+    "err.ai_nothing_to_read": "🤖 O'qish uchun matn juda qisqa.",
+    "err.ai_expired": "🤖 Bu taklifning muddati o'tgan. /ai tasks ni qayta yuboring.",
+    "err.ai_not_yours": "🤖 Faqat so'rov yuborgan odam tasdiqlay oladi.",
     "err.same_status": "ℹ️ Vazifa allaqachon shu holatda: {status}.",
     "err.self_approval": (
         "🔒 O'zingiz bajargan vazifani o'zingiz tasdiqlay olmaysiz. "

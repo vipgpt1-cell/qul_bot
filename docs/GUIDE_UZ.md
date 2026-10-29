@@ -74,7 +74,30 @@ Mavjud: **mobile, frontend, backend, pm, qa, devops, other**. Admin boshqalarga 
 Vazifa kartasidagi **👥 Tayinlash** tugmasi: avval guruhni (Mobile, Backend...), keyin odamni
 tanlaysiz. Ismni bossangiz — tayinlanadi va unga xabar boradi; yana bossangiz — olib tashlanadi.
 
-## 6. Adminlar uchun
+## 6. Test (QA), buglar va relizlar
+
+* Jamoada **QA** mutaxassisi bo'lsa, tasdiqlangan vazifa **🧪 Testda** bosqichiga o'tadi.
+  QA `/approve 12` (o'tdi) yoki `/reject 12 sabab` (o'tmadi) qiladi.
+* `/check 12 Login ishlaydi; Dark mode` — tekshiruv ro'yxati. Hamma band belgilanmaguncha vazifa
+  bajarildi bo'lmaydi. Ko'rish: `/check 12` yoki kartadagi ☑️ tugma.
+* `/bug` — bug hisoboti: bot savollar beradi, siz **javob berib** yozasiz (skrinshot ham).
+  Bekor qilish: `/cancel`. Ochiq buglar: `/bugs`.
+* Reliz: vazifaga `v:1.4.0` qo'shing. `/release 1.4.0` — reliz tayyormi yoki yo'qmi.
+
+## 7. Build (APK/IPA) tekshiruvi
+
+.apk yoki .ipa faylni `/apk` izohi bilan yuboring (yoki faylga javob berib `/apk`). Bot versiya,
+Android/iOS talablari, imzo, ruxsatlar va xatolarni ko'rsatadi: debuggable build, debug kalit,
+eski targetSdk, muddati o'tgan profil va hokazo. 20 MB dan katta fayllar uchun admin sozlashi kerak.
+
+## 8. AI yordamchi
+
+* Muhokama xabariga javob berib `/ai tasks` — bot vazifalarni taklif qiladi, **✅ Hammasini
+  yaratish** tugmasi bilan yaratasiz.
+* `/ai standup` — bugungi standup.
+* `/ai Ali nima ustida ishlayapti?` — savol bering.
+
+## 9. Adminlar uchun
 
 * `/addarea mobile Mobil ilova` — yo'nalish qo'shish, `/delarea mobile`, `/areas`
 * `/digest 09:00` — avtomatik xulosa vaqti, `/digest off` — o'chirish. Xulosa har **ish kuni** ertalab
